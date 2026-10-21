@@ -70,4 +70,4 @@ Acesse **http://127.0.0.1:5000** no navegador.
 
 Feito por **Bruno Silva**, estudante de Análise e Desenvolvimento de Sistemas.
 
-[GitHub](https://github.com/Silvaxzy) · [LinkedIn](https://www.linkedin.com/in/bruno-silva-2846)
+[GitHub](https://github.com/Silvaxzy) · [LinkedIn](https://www.linkedin.com/in/bruno-silva-2846192aa) · [Portfólio](https://silvaxzy.github.io)
