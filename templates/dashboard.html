@@ -8,6 +8,74 @@
 </header>
 
 <main class="painel">
-    <p>Seu painel vai aparecer aqui na próxima etapa.</p>
+    <!-- Cards de resumo -->
+    <section class="cards">
+        <div class="card">
+            <span class="card-titulo">Saldo</span>
+            <strong id="saldo">R$ 0,00</strong>
+        </div>
+        <div class="card receita">
+            <span class="card-titulo">Receitas</span>
+            <strong id="total-receitas">R$ 0,00</strong>
+        </div>
+        <div class="card despesa">
+            <span class="card-titulo">Despesas</span>
+            <strong id="total-despesas">R$ 0,00</strong>
+        </div>
+    </section>
+
+    <section class="grade">
+        <!-- Formulário -->
+        <form id="form-transacao" class="bloco">
+            <h2>Nova transação</h2>
+
+            <label for="descricao">Descrição</label>
+            <input type="text" id="descricao" placeholder="Ex: Mercado" required>
+
+            <label for="valor">Valor (R$)</label>
+            <input type="number" id="valor" step="0.01" min="0.01" placeholder="0,00" required>
+
+            <label for="tipo">Tipo</label>
+            <select id="tipo">
+                <option value="despesa">Despesa</option>
+                <option value="receita">Receita</option>
+            </select>
+
+            <label for="categoria">Categoria</label>
+            <select id="categoria">
+                <option>Alimentação</option>
+                <option>Transporte</option>
+                <option>Moradia</option>
+                <option>Lazer</option>
+                <option>Saúde</option>
+                <option>Educação</option>
+                <option>Salário</option>
+                <option>Outros</option>
+            </select>
+
+            <label for="data">Data</label>
+            <input type="date" id="data" required>
+
+            <button type="submit">Adicionar</button>
+            <p id="mensagem" class="mensagem"></p>
+        </form>
+
+        <!-- Gráfico -->
+        <div class="bloco">
+            <h2>Despesas por categoria</h2>
+            <canvas id="grafico"></canvas>
+            <p id="sem-dados-grafico" class="vazio">Nenhuma despesa ainda.</p>
+        </div>
+    </section>
+
+    <!-- Histórico -->
+    <section class="bloco">
+        <h2>Histórico</h2>
+        <ul id="lista-transacoes" class="lista"></ul>
+        <p id="sem-transacoes" class="vazio">Nenhuma transação cadastrada.</p>
+    </section>
 </main>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='js/painel.js') }}"></script>
 {% endblock %}

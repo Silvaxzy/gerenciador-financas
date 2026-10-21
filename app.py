@@ -1,7 +1,7 @@
 import sqlite3
 from functools import wraps
 
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from database import conectar, criar_tabelas
@@ -21,6 +21,8 @@ def login_obrigatorio(rota):
         return rota(*args, **kwargs)
     return verificar
 
+
+# ---------------- Páginas ----------------
 
 @app.route("/")
 def inicio():
@@ -88,6 +90,60 @@ def logout():
 @login_obrigatorio
 def dashboard():
     return render_template("dashboard.html", nome=session["nome"])
+
+
+# ---------------- API (usada pelo JavaScript) ----------------
+
+@app.route("/api/transacoes", methods=["GET"])
+@login_obrigatorio
+def listar_transacoes():
+    with conectar() as conexao:
+        linhas = conexao.execute(
+            """SELECT id, descricao, valor, tipo, categoria, data
+               FROM transacoes
+               WHERE usuario_id = ?
+               ORDER BY data DESC, id DESC""",
+            (session["usuario_id"],),
+        ).fetchall()
+    return jsonify([dict(linha) for linha in linhas])
+
+
+@app.route("/api/transacoes", methods=["POST"])
+@login_obrigatorio
+def criar_transacao():
+    dados = request.get_json(silent=True) or {}
+
+    descricao = (dados.get("descricao") or "").strip()
+    tipo = dados.get("tipo")
+    categoria = (dados.get("categoria") or "Outros").strip()
+    data = dados.get("data")
+
+    try:
+        valor = float(dados.get("valor"))
+    except (TypeError, ValueError):
+        return jsonify({"erro": "Valor inválido."}), 400
+
+    if not descricao or valor <= 0 or tipo not in ("receita", "despesa") or not data:
+        return jsonify({"erro": "Preencha todos os campos corretamente."}), 400
+
+    with conectar() as conexao:
+        cursor = conexao.execute(
+            """INSERT INTO transacoes (usuario_id, descricao, valor, tipo, categoria, data)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (session["usuario_id"], descricao, valor, tipo, categoria, data),
+        )
+    return jsonify({"id": cursor.lastrowid}), 201
+
+
+@app.route("/api/transacoes/<int:transacao_id>", methods=["DELETE"])
+@login_obrigatorio
+def excluir_transacao(transacao_id):
+    with conectar() as conexao:
+        conexao.execute(
+            "DELETE FROM transacoes WHERE id = ? AND usuario_id = ?",
+            (transacao_id, session["usuario_id"]),
+        )
+    return jsonify({"ok": True})
 
 
 if __name__ == "__main__":

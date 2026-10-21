@@ -140,4 +140,144 @@ body {
     max-width: 1000px;
     margin: 32px auto;
     padding: 0 16px;
+}/* ---------- Dashboard ---------- */
+.cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.card {
+    background: var(--card);
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    border-top: 4px solid var(--primaria);
+}
+
+.card.receita { border-top-color: var(--verde); }
+.card.despesa { border-top-color: var(--vermelho); }
+
+.card-titulo {
+    display: block;
+    font-size: 14px;
+    color: var(--texto-suave);
+    margin-bottom: 8px;
+}
+
+.card strong { font-size: 26px; }
+.negativo { color: var(--vermelho); }
+
+.grade {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.bloco {
+    background: var(--card);
+    padding: 24px;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.bloco h2 {
+    font-size: 18px;
+    margin-bottom: 16px;
+}
+
+/* Formulário */
+#form-transacao {
+    display: flex;
+    flex-direction: column;
+}
+
+#form-transacao label {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+#form-transacao input,
+#form-transacao select {
+    padding: 10px;
+    border: 1px solid var(--borda);
+    border-radius: 8px;
+    font-size: 15px;
+    font-family: inherit;
+    margin-bottom: 14px;
+}
+
+#form-transacao button {
+    padding: 12px;
+    background: var(--primaria);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+#form-transacao button:hover { background: var(--primaria-escura); }
+
+.mensagem {
+    font-size: 14px;
+    margin-top: 10px;
+    min-height: 20px;
+}
+
+.mensagem.sucesso { color: var(--verde); }
+.mensagem.erro { color: var(--vermelho); }
+
+/* Histórico */
+.lista { list-style: none; }
+
+.lista li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border: 1px solid var(--borda);
+    border-left: 5px solid;
+    border-radius: 8px;
+    margin-bottom: 8px;
+}
+
+.lista li.receita { border-left-color: var(--verde); }
+.lista li.despesa { border-left-color: var(--vermelho); }
+
+.lista small {
+    display: block;
+    color: var(--texto-suave);
+    font-size: 13px;
+    margin-top: 2px;
+}
+
+.direita {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.lista li.receita .valor { color: var(--verde); font-weight: 600; }
+.lista li.despesa .valor { color: var(--vermelho); font-weight: 600; }
+
+.excluir {
+    background: none;
+    border: none;
+    color: var(--texto-suave);
+    font-size: 16px;
+    cursor: pointer;
+}
+
+.excluir:hover { color: var(--vermelho); }
+
+.vazio {
+    color: var(--texto-suave);
+    font-size: 14px;
+    text-align: center;
+    padding: 16px 0;
 }
