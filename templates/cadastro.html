@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block titulo %}Criar conta | Finanças{% endblock %}
+
+{% block conteudo %}
+<main class="auth">
+    <form class="auth-card" method="POST">
+        <h1>💰 Finanças</h1>
+        <p class="subtitulo">Crie sua conta gratuita</p>
+
+        {% with mensagens = get_flashed_messages(with_categories=true) %}
+            {% for categoria, mensagem in mensagens %}
+                <div class="alerta {{ categoria }}">{{ mensagem }}</div>
+            {% endfor %}
+        {% endwith %}
+
+        <label for="nome">Nome</label>
+        <input type="text" id="nome" name="nome" placeholder="Seu nome" required>
+
+        <label for="email">E-mail</label>
+        <input type="email" id="email" name="email" placeholder="voce@email.com" required>
+
+        <label for="senha">Senha</label>
+        <input type="password" id="senha" name="senha" placeholder="Mínimo 6 caracteres" required>
+
+        <button type="submit">Criar conta</button>
+
+        <p class="troca">Já tem conta? <a href="{{ url_for('login') }}">Entrar</a></p>
+    </form>
+</main>
+{% endblock %}

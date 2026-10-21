@@ -1,0 +1,143 @@
+:root {
+    --primaria: #4f46e5;
+    --primaria-escura: #4338ca;
+    --fundo: #f5f7fb;
+    --card: #ffffff;
+    --texto: #1f2937;
+    --texto-suave: #6b7280;
+    --borda: #e5e7eb;
+    --verde: #16a34a;
+    --vermelho: #dc2626;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: "Inter", Arial, sans-serif;
+    background: var(--fundo);
+    color: var(--texto);
+}
+
+/* ---------- Login e cadastro ---------- */
+.auth {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+}
+
+.auth-card {
+    width: 100%;
+    max-width: 380px;
+    background: var(--card);
+    padding: 40px 32px;
+    border-radius: 16px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+    display: flex;
+    flex-direction: column;
+}
+
+.auth-card h1 {
+    font-size: 26px;
+    text-align: center;
+}
+
+.subtitulo {
+    text-align: center;
+    color: var(--texto-suave);
+    margin: 8px 0 24px;
+}
+
+.auth-card label {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.auth-card input {
+    padding: 12px;
+    border: 1px solid var(--borda);
+    border-radius: 8px;
+    font-size: 15px;
+    margin-bottom: 16px;
+}
+
+.auth-card input:focus {
+    outline: none;
+    border-color: var(--primaria);
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+}
+
+.auth-card button {
+    padding: 12px;
+    background: var(--primaria);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.auth-card button:hover {
+    background: var(--primaria-escura);
+}
+
+.troca {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 14px;
+    color: var(--texto-suave);
+}
+
+.troca a {
+    color: var(--primaria);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.alerta {
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    margin-bottom: 16px;
+}
+
+.alerta.erro {
+    background: #fee2e2;
+    color: var(--vermelho);
+}
+
+.alerta.sucesso {
+    background: #dcfce7;
+    color: var(--verde);
+}
+
+/* ---------- Painel ---------- */
+.topo {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 32px;
+    background: var(--card);
+    border-bottom: 1px solid var(--borda);
+}
+
+.topo a {
+    color: var(--primaria);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.painel {
+    max-width: 1000px;
+    margin: 32px auto;
+    padding: 0 16px;
+}

@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block titulo %}Painel | Finanças{% endblock %}
+
+{% block conteudo %}
+<header class="topo">
+    <h1>💰 Finanças</h1>
+    <div>Olá, <strong>{{ nome }}</strong> · <a href="{{ url_for('logout') }}">Sair</a></div>
+</header>
+
+<main class="painel">
+    <p>Seu painel vai aparecer aqui na próxima etapa.</p>
+</main>
+{% endblock %}
