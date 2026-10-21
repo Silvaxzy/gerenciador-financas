@@ -3,7 +3,7 @@
 
 {% block conteudo %}
 <header class="topo">
-    <h1>💰 Finanças</h1>
+    <h1>💰 Finance</h1>
     <div>Olá, <strong>{{ nome }}</strong> · <a href="{{ url_for('logout') }}">Sair</a></div>
 </header>
 
@@ -63,7 +63,9 @@
         <!-- Gráfico -->
         <div class="bloco">
             <h2>Despesas por categoria</h2>
-            <canvas id="grafico"></canvas>
+            <div class="grafico-area">
+    <canvas id="grafico"></canvas>
+</div>
             <p id="sem-dados-grafico" class="vazio">Nenhuma despesa ainda.</p>
         </div>
     </section>

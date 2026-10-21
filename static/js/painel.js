@@ -117,6 +117,7 @@ function atualizarGrafico(transacoes) {
             }],
         },
         options: {
+            maintainAspectRatio: false,
             plugins: { legend: { position: "bottom" } },
         },
     });

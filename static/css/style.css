@@ -280,4 +280,7 @@ body {
     font-size: 14px;
     text-align: center;
     padding: 16px 0;
+}.grafico-area {
+    position: relative;
+    height: 300px;
 }
