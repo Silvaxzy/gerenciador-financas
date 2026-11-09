@@ -3,26 +3,38 @@
 
 {% block conteudo %}
 <main class="auth">
+    <div class="auth-brilho" aria-hidden="true"></div>
+    <section class="auth-lado" aria-hidden="true">
+        <div class="logo"><span class="logo-icone"></span>Finanças</div>
+        <h2>Comece a organizar seu dinheiro hoje.</h2>
+        <p>Crie sua conta gratuita e tenha uma visão clara de receitas, despesas e metas.</p>
+        <ul>
+            <li>Gráficos dos últimos 12 meses</li>
+            <li>Alertas quando os gastos sobem</li>
+            <li>Exportação para Excel (CSV)</li>
+        </ul>
+    </section>
+
     <form class="auth-card" method="POST">
-        <h1>💰 Finanças</h1>
-        <p class="subtitulo">Crie sua conta gratuita</p>
+        <h1>Criar conta</h1>
+        <p class="subtitulo">Leva menos de um minuto</p>
 
         {% with mensagens = get_flashed_messages(with_categories=true) %}
             {% for categoria, mensagem in mensagens %}
-                <div class="alerta {{ categoria }}">{{ mensagem }}</div>
+                <div class="alerta {{ categoria }}" role="alert">{{ mensagem }}</div>
             {% endfor %}
         {% endwith %}
 
         <label for="nome">Nome</label>
-        <input type="text" id="nome" name="nome" placeholder="Seu nome" required>
+        <input type="text" id="nome" name="nome" placeholder="Seu nome" autocomplete="name" required>
 
         <label for="email">E-mail</label>
-        <input type="email" id="email" name="email" placeholder="voce@email.com" required>
+        <input type="email" id="email" name="email" placeholder="voce@email.com" autocomplete="email" required>
 
         <label for="senha">Senha</label>
-        <input type="password" id="senha" name="senha" placeholder="Mínimo 6 caracteres" required>
+        <input type="password" id="senha" name="senha" placeholder="Mínimo 6 caracteres" minlength="6" autocomplete="new-password" required>
 
-        <button type="submit">Criar conta</button>
+        <button type="submit" class="botao botao-primario">Criar conta</button>
 
         <p class="troca">Já tem conta? <a href="{{ url_for('login') }}">Entrar</a></p>
     </form>

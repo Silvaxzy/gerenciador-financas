@@ -1,69 +1,119 @@
-# 💰 Gerenciador de Finanças
+# 💰 Gerenciador de Finanças 2.0
 
-Aplicação web Full Stack para controle de finanças pessoais. O usuário cria uma conta, faz login e registra receitas e despesas, acompanhando o saldo e os gastos por categoria em um painel interativo.
+Aplicação web Full Stack para controle financeiro pessoal, com **integração Open Finance** para importar o histórico de transações direto do banco, **análises automáticas** e **orçamento por categoria**.
 
 ![Painel](screenshots/painel.png)
 
 ## ✨ Funcionalidades
 
-- Cadastro e login de usuários com senha criptografada (hash)
-- Cada usuário vê apenas as próprias transações
-- Cadastro e exclusão de receitas e despesas sem recarregar a página
-- Cards de resumo com saldo, total de receitas e total de despesas
-- Gráfico de despesas por categoria
-- Histórico de transações ordenado por data
+**Open Finance (Pluggy)**
+- Conexão com bancos pelo widget oficial da Pluggy
+- Importação automática do histórico (padrão: últimos 12 meses), com paginação por cursor
+- Sincronização sem duplicar transações (chave única por transação do banco)
+- Conversão das categorias do banco para as categorias do app
+
+**Análises**
+- Indicadores do mês: saldo, receitas, despesas e taxa de poupança
+- Comparação com o mês anterior (no mês atual, compara o **mesmo período**, dia 1 até hoje)
+- Gráfico de receitas, despesas e saldo dos últimos 12 meses
+- Despesas por categoria, com variação em relação ao mês anterior
+- Média de gasto diário e **projeção de gasto** até o fim do mês
+- **Insights automáticos**: alerta de gastos acima da média, categoria que mais subiu, orçamento estourado
+- Ranking das maiores despesas
+
+**Gestão**
+- Cadastro e login com senha criptografada (hash)
+- Criar, editar e excluir transações
+- Filtros por texto, tipo, categoria, origem e período
+- Orçamento mensal por categoria, com barras de progresso
+- Exportação para CSV (abre direto no Excel)
+- Dados de exemplo para demonstração
+- Layout responsivo (computador e celular)
+
+## 📸 Telas
+
+| Transações | Orçamentos |
+|---|---|
+| ![Transações](screenshots/transacoes.png) | ![Orçamentos](screenshots/orcamentos.png) |
+
+| Bancos (Open Finance) | Login |
+|---|---|
+| ![Bancos](screenshots/bancos.png) | ![Login](screenshots/login.png) |
 
 ## 🛠️ Tecnologias
 
 | Camada | Tecnologias |
 |---|---|
-| Back-end | Python, Flask |
-| Banco de dados | SQLite |
+| Back-end | Python, Flask, Requests |
+| Banco de dados | SQLite (com migração automática) |
 | Front-end | HTML, CSS, JavaScript (Fetch API) |
 | Gráficos | Chart.js |
+| Integração | Pluggy API (Open Finance) |
 
 ## 🏗️ Arquitetura
 
-O back-end em Flask funciona como uma **API REST** que retorna dados em JSON. O front-end em JavaScript consome essa API com `fetch` e atualiza a tela dinamicamente.
+```
+app.py        → rotas das páginas e da API REST
+analises.py   → cálculos de indicadores, séries e insights
+pluggy.py     → cliente da API da Pluggy e conversão das transações
+database.py   → criação e migração das tabelas
+exemplo.py    → gerador de dados de demonstração
+```
+
+As credenciais da Pluggy ficam **só no servidor**. O navegador recebe apenas um *connect token* temporário, como recomenda a documentação oficial.
 
 | Método | Rota | Descrição |
 |---|---|---|
-| GET | `/api/transacoes` | Lista as transações do usuário logado |
-| POST | `/api/transacoes` | Cria uma nova transação |
-| DELETE | `/api/transacoes/<id>` | Exclui uma transação |
+| GET | `/api/resumo?mes=AAAA-MM` | Indicadores, séries, categorias e insights |
+| GET | `/api/transacoes` | Lista com filtros |
+| POST / PUT / DELETE | `/api/transacoes[/<id>]` | Criar, editar e excluir |
+| PUT | `/api/orcamentos` | Definir limite por categoria |
+| GET | `/api/exportar.csv` | Exportar para CSV |
+| POST | `/api/pluggy/token` | Gera o connect token do widget |
+| POST | `/api/pluggy/conexoes` | Importa o histórico de um banco conectado |
+| POST | `/api/pluggy/sincronizar` | Atualiza todos os bancos conectados |
 
-## 🚀 Como rodar o projeto
+## 🚀 Como rodar
 
 ```bash
-# Clonar o repositório
 git clone https://github.com/Silvaxzy/gerenciador-financas.git
 cd gerenciador-financas
 
-# Criar e ativar o ambiente virtual
 python -m venv venv
 venv\Scripts\activate        # Windows
 source venv/bin/activate     # Linux/Mac
 
-# Instalar as dependências
 pip install -r requirements.txt
+```
 
-# Rodar
+Copie o arquivo `.env.example` para `.env` e preencha:
+
+```
+SECRET_KEY=uma-frase-secreta-longa
+PLUGGY_CLIENT_ID=seu-client-id
+PLUGGY_CLIENT_SECRET=seu-client-secret
+```
+
+As credenciais da Pluggy são obtidas em [dashboard.pluggy.ai](https://dashboard.pluggy.ai). Sem elas, o app funciona normalmente, só sem a importação bancária.
+
+```bash
 python app.py
 ```
 
-Acesse **http://127.0.0.1:5000** no navegador.
+Acesse **http://127.0.0.1:5000**.
 
-## 📸 Telas
+### Testando o Open Finance
 
-| Login | Painel |
-|---|---|
-| ![Login](screenshots/login.png) | ![Painel](screenshots/painel.png) |
+Na aba **Bancos**, clique em **Conectar banco**, escolha o **Pluggy Bank** (banco de testes) e entre com:
+
+- Usuário: `user-ok`
+- Senha: `password-ok`
 
 ## 📌 Próximas melhorias
 
-- [ ] Editar transações
-- [ ] Filtrar por mês e categoria
-- [ ] Exportar relatório em CSV
+- [ ] Metas de economia
+- [ ] Importação de extrato em OFX
+- [ ] Webhooks da Pluggy para sincronização automática
 - [ ] Deploy online
 
 ## 👤 Autor

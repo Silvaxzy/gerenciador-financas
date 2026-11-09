@@ -2,82 +2,268 @@
 {% block titulo %}Painel | Finanças{% endblock %}
 
 {% block conteudo %}
-<header class="topo">
-    <h1>💰 Finance</h1>
-    <div>Olá, <strong>{{ nome }}</strong> · <a href="{{ url_for('logout') }}">Sair</a></div>
-</header>
+<div class="app">
+    <!-- ================= Menu lateral ================= -->
+    <aside class="lateral">
+        <div class="logo"><span class="logo-icone"></span>Finanças</div>
 
-<main class="painel">
-    <!-- Cards de resumo -->
-    <section class="cards">
-        <div class="card">
-            <span class="card-titulo">Saldo</span>
-            <strong id="saldo">R$ 0,00</strong>
+        <nav class="menu" aria-label="Seções do painel">
+            <button class="menu-item ativo" data-aba="visao">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 13h8V3H3zm0 8h8v-6H3zm10 0h8V11h-8zm0-18v6h8V3z"/></svg>
+                <span>Visão geral</span>
+            </button>
+            <button class="menu-item" data-aba="transacoes">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10" fill="none" stroke-width="2" stroke-linecap="round"/></svg>
+                <span>Transações</span>
+            </button>
+            <button class="menu-item" data-aba="orcamentos">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10H12z"/><path d="M14 2.2V10h7.8A10 10 0 0 0 14 2.2z" opacity=".55"/></svg>
+                <span>Orçamentos</span>
+            </button>
+            <button class="menu-item" data-aba="conexoes">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10l9-6 9 6v1H3zm2 2h2v6H5zm4 0h2v6H9zm4 0h2v6h-2zm4 0h2v6h-2zM3 20h18v2H3z"/></svg>
+                <span>Bancos</span>
+            </button>
+        </nav>
+
+        <div class="usuario">
+            <span class="avatar-letra">{{ nome[:1] | upper }}</span>
+            <div>
+                <strong>{{ nome }}</strong>
+                <a href="{{ url_for('logout') }}">Sair</a>
+            </div>
         </div>
-        <div class="card receita">
-            <span class="card-titulo">Receitas</span>
-            <strong id="total-receitas">R$ 0,00</strong>
-        </div>
-        <div class="card despesa">
-            <span class="card-titulo">Despesas</span>
-            <strong id="total-despesas">R$ 0,00</strong>
-        </div>
-    </section>
+    </aside>
 
-    <section class="grade">
-        <!-- Formulário -->
-        <form id="form-transacao" class="bloco">
-            <h2>Nova transação</h2>
+    <!-- ================= Conteúdo ================= -->
+    <main class="conteudo">
+        <header class="topo">
+            <div>
+                <p class="topo-etiqueta">Olá, {{ nome.split(' ')[0] }}</p>
+                <h1 id="titulo-aba">Visão geral</h1>
+            </div>
+            <div class="topo-acoes">
+                <label class="seletor-mes" for="mes">
+                    <span class="sr-only">Mês de referência</span>
+                    <input type="month" id="mes">
+                </label>
+                <button class="botao botao-primario" id="nova-transacao">
+                    <span aria-hidden="true">+</span> Nova transação
+                </button>
+            </div>
+        </header>
 
-            <label for="descricao">Descrição</label>
-            <input type="text" id="descricao" placeholder="Ex: Mercado" required>
+        <!-- ---------- Visão geral ---------- -->
+        <section class="aba" id="aba-visao">
+            <div class="kpis">
+                <article class="kpi kpi-destaque">
+                    <span class="kpi-titulo">Saldo do mês</span>
+                    <strong id="kpi-saldo">R$ 0,00</strong>
+                    <span class="kpi-rodape" id="kpi-saldo-total"></span>
+                </article>
+                <article class="kpi">
+                    <span class="kpi-titulo">Receitas</span>
+                    <strong id="kpi-receitas" class="positivo">R$ 0,00</strong>
+                    <span class="kpi-rodape" id="kpi-var-receitas"></span>
+                </article>
+                <article class="kpi">
+                    <span class="kpi-titulo">Despesas</span>
+                    <strong id="kpi-despesas" class="negativo">R$ 0,00</strong>
+                    <span class="kpi-rodape" id="kpi-var-despesas"></span>
+                </article>
+                <article class="kpi">
+                    <span class="kpi-titulo">Taxa de poupança</span>
+                    <strong id="kpi-poupanca">—</strong>
+                    <div class="barra"><span id="barra-poupanca"></span></div>
+                </article>
+            </div>
 
-            <label for="valor">Valor (R$)</label>
-            <input type="number" id="valor" step="0.01" min="0.01" placeholder="0,00" required>
+            <div class="grade grade-2-1">
+                <article class="cartao">
+                    <header class="cartao-topo">
+                        <h2>Receitas x despesas</h2>
+                        <span class="cartao-sub">Últimos 12 meses</span>
+                    </header>
+                    <div class="grafico-area alto"><canvas id="grafico-evolucao"></canvas></div>
+                </article>
 
-            <label for="tipo">Tipo</label>
-            <select id="tipo">
-                <option value="despesa">Despesa</option>
-                <option value="receita">Receita</option>
-            </select>
+                <article class="cartao">
+                    <header class="cartao-topo">
+                        <h2>Insights</h2>
+                        <span class="cartao-sub">Gerados a partir dos seus dados</span>
+                    </header>
+                    <ul class="insights" id="insights"></ul>
+                    <div class="mini-kpis">
+                        <div><span>Média diária</span><strong id="kpi-media">—</strong></div>
+                        <div><span id="rotulo-projecao">Projeção do mês</span><strong id="kpi-projecao">—</strong></div>
+                    </div>
+                </article>
+            </div>
 
-            <label for="categoria">Categoria</label>
-            <select id="categoria">
-                <option>Alimentação</option>
-                <option>Transporte</option>
-                <option>Moradia</option>
-                <option>Lazer</option>
-                <option>Saúde</option>
-                <option>Educação</option>
-                <option>Salário</option>
-                <option>Outros</option>
-            </select>
+            <div class="grade grade-1-1">
+                <article class="cartao">
+                    <header class="cartao-topo">
+                        <h2>Despesas por categoria</h2>
+                        <span class="cartao-sub" id="sub-categorias"></span>
+                    </header>
+                    <div class="categorias-grid">
+                        <div class="grafico-area donut"><canvas id="grafico-categorias"></canvas></div>
+                        <ul class="lista-categorias" id="lista-categorias"></ul>
+                    </div>
+                </article>
 
-            <label for="data">Data</label>
-            <input type="date" id="data" required>
+                <article class="cartao">
+                    <header class="cartao-topo">
+                        <h2>Maiores despesas do mês</h2>
+                    </header>
+                    <ol class="maiores" id="maiores"></ol>
+                </article>
+            </div>
+        </section>
 
-            <button type="submit">Adicionar</button>
-            <p id="mensagem" class="mensagem"></p>
-        </form>
+        <!-- ---------- Transações ---------- -->
+        <section class="aba" id="aba-transacoes" hidden>
+            <form class="filtros cartao" id="filtros">
+                <input type="search" name="busca" placeholder="Buscar descrição..." aria-label="Buscar descrição">
+                <select name="tipo" aria-label="Tipo">
+                    <option value="">Todos os tipos</option>
+                    <option value="receita">Receitas</option>
+                    <option value="despesa">Despesas</option>
+                </select>
+                <select name="categoria" aria-label="Categoria">
+                    <option value="">Todas as categorias</option>
+                    {% for c in categorias %}<option>{{ c }}</option>{% endfor %}
+                </select>
+                <select name="origem" aria-label="Origem">
+                    <option value="">Todas as origens</option>
+                    <option value="manual">Manual</option>
+                    <option value="banco">Banco (Open Finance)</option>
+                    <option value="exemplo">Exemplo</option>
+                </select>
+                <input type="date" name="inicio" aria-label="Data inicial">
+                <input type="date" name="fim" aria-label="Data final">
+                <button type="button" class="botao botao-secundario" id="exportar">Exportar CSV</button>
+            </form>
 
-        <!-- Gráfico -->
-        <div class="bloco">
-            <h2>Despesas por categoria</h2>
-            <div class="grafico-area">
-    <canvas id="grafico"></canvas>
+            <article class="cartao">
+                <header class="cartao-topo">
+                    <h2>Histórico</h2>
+                    <span class="cartao-sub" id="contagem-transacoes"></span>
+                </header>
+                <div class="tabela-rolagem">
+                    <table class="tabela">
+                        <thead>
+                            <tr>
+                                <th>Data</th>
+                                <th>Descrição</th>
+                                <th>Categoria</th>
+                                <th>Origem</th>
+                                <th class="direita">Valor</th>
+                                <th><span class="sr-only">Ações</span></th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-transacoes"></tbody>
+                    </table>
+                </div>
+                <p class="vazio" id="sem-transacoes" hidden>Nenhuma transação encontrada.</p>
+            </article>
+        </section>
+
+        <!-- ---------- Orçamentos ---------- -->
+        <section class="aba" id="aba-orcamentos" hidden>
+            <article class="cartao">
+                <header class="cartao-topo">
+                    <h2>Orçamento mensal por categoria</h2>
+                    <span class="cartao-sub">Defina um limite e acompanhe o quanto já foi gasto no mês selecionado</span>
+                </header>
+                <ul class="orcamentos" id="orcamentos"></ul>
+            </article>
+        </section>
+
+        <!-- ---------- Bancos (Open Finance) ---------- -->
+        <section class="aba" id="aba-conexoes" hidden>
+            <div class="grade grade-2-1">
+                <article class="cartao">
+                    <header class="cartao-topo">
+                        <h2>Bancos conectados</h2>
+                        <span class="cartao-sub">Importe o histórico de transações via Open Finance (Pluggy)</span>
+                    </header>
+                    <div id="aviso-pluggy" class="aviso" hidden>
+                        A integração ainda não está configurada. Crie uma conta em
+                        <a href="https://dashboard.pluggy.ai" target="_blank" rel="noopener noreferrer">dashboard.pluggy.ai</a>,
+                        copie o <code>CLIENT_ID</code> e o <code>CLIENT_SECRET</code> para o arquivo <code>.env</code> e reinicie o app.
+                    </div>
+                    <ul class="conexoes" id="lista-conexoes"></ul>
+                    <p class="vazio" id="sem-conexoes">Nenhum banco conectado ainda.</p>
+                    <div class="acoes-linha">
+                        <button class="botao botao-primario" id="conectar-banco">Conectar banco</button>
+                        <button class="botao botao-secundario" id="sincronizar">Sincronizar agora</button>
+                    </div>
+                </article>
+
+                <article class="cartao">
+                    <header class="cartao-topo"><h2>Modo de teste</h2></header>
+                    <p class="texto-suave">No widget, escolha o banco <strong>Pluggy Bank</strong> e use:</p>
+                    <dl class="credenciais">
+                        <div><dt>Usuário</dt><dd><code>user-ok</code></dd></div>
+                        <div><dt>Senha</dt><dd><code>password-ok</code></dd></div>
+                        <div><dt>Token (se pedir)</dt><dd><code>123456</code></dd></div>
+                    </dl>
+                    <hr>
+                    <h3>Dados de exemplo</h3>
+                    <p class="texto-suave">Preenche 12 meses de transações fictícias para demonstrar o painel.</p>
+                    <div class="acoes-linha">
+                        <button class="botao botao-secundario" id="carregar-exemplo">Carregar exemplo</button>
+                        <button class="botao botao-fantasma" id="apagar-exemplo">Remover exemplo</button>
+                    </div>
+                </article>
+            </div>
+        </section>
+    </main>
 </div>
-            <p id="sem-dados-grafico" class="vazio">Nenhuma despesa ainda.</p>
+
+<!-- ================= Modal de transação ================= -->
+<dialog class="modal" id="modal">
+    <form id="form-transacao" method="dialog">
+        <header class="cartao-topo">
+            <h2 id="titulo-modal">Nova transação</h2>
+            <button type="button" class="fechar" id="fechar-modal" aria-label="Fechar">✕</button>
+        </header>
+
+        <div class="tipo-alternar" role="radiogroup" aria-label="Tipo">
+            <label><input type="radio" name="tipo" value="despesa" checked><span>Despesa</span></label>
+            <label><input type="radio" name="tipo" value="receita"><span>Receita</span></label>
         </div>
-    </section>
 
-    <!-- Histórico -->
-    <section class="bloco">
-        <h2>Histórico</h2>
-        <ul id="lista-transacoes" class="lista"></ul>
-        <p id="sem-transacoes" class="vazio">Nenhuma transação cadastrada.</p>
-    </section>
-</main>
+        <label for="descricao">Descrição</label>
+        <input type="text" id="descricao" maxlength="120" placeholder="Ex: Mercado" required>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+        <div class="duas-colunas">
+            <div>
+                <label for="valor">Valor (R$)</label>
+                <input type="number" id="valor" step="0.01" min="0.01" placeholder="0,00" required>
+            </div>
+            <div>
+                <label for="data">Data</label>
+                <input type="date" id="data" required>
+            </div>
+        </div>
+
+        <label for="categoria">Categoria</label>
+        <select id="categoria">
+            {% for c in categorias %}<option>{{ c }}</option>{% endfor %}
+        </select>
+
+        <p class="mensagem" id="mensagem-modal" role="status"></p>
+        <button type="submit" class="botao botao-primario largura-total">Salvar</button>
+    </form>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+    window.CATEGORIAS = {{ categorias | tojson }};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.js"></script>
 <script src="{{ url_for('static', filename='js/painel.js') }}"></script>
 {% endblock %}
