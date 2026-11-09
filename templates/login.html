@@ -34,6 +34,12 @@
         <button type="submit" class="botao botao-primario">Entrar</button>
 
         <p class="troca">Não tem conta? <a href="{{ url_for('cadastro') }}">Criar conta</a></p>
+
+        {% if modo_demo %}
+        <div class="divisor"><span>ou</span></div>
+        <a class="botao botao-secundario largura-total" href="{{ url_for('entrar_demo') }}">Entrar como visitante (demonstração)</a>
+        <p class="nota-demo">Cria uma conta temporária com 12 meses de dados fictícios.</p>
+        {% endif %}
     </form>
 </main>
 {% endblock %}

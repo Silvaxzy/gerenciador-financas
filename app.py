@@ -38,6 +38,7 @@ app.secret_key = chave_secreta()
 PLUGGY_CLIENT_ID = os.environ.get("PLUGGY_CLIENT_ID", "")
 PLUGGY_CLIENT_SECRET = os.environ.get("PLUGGY_CLIENT_SECRET", "")
 MESES_HISTORICO = int(os.environ.get("MESES_HISTORICO", "12"))  # quanto do passado importar do banco
+MODO_DEMO = os.environ.get("DEMO") == "1"  # versão online de demonstração
 
 criar_tabelas()
 
@@ -129,6 +130,47 @@ def login():
         return redirect(url_for("login"))
 
     return render_template("login.html")
+
+
+@app.context_processor
+def variaveis_globais():
+    return {"modo_demo": MODO_DEMO}
+
+
+@app.route("/demo")
+def entrar_demo():
+    """Cria uma conta de visitante com dados de exemplo e já entra no painel."""
+    if not MODO_DEMO:
+        return redirect(url_for("login"))
+    with conectar() as conexao:
+        # mantém só os 100 visitantes mais recentes para o banco não crescer
+        antigos = conexao.execute(
+            """SELECT id FROM usuarios WHERE email LIKE 'visitante-%@demo.local'
+               ORDER BY id DESC LIMIT -1 OFFSET 100"""
+        ).fetchall()
+        for linha in antigos:
+            for tabela in ("transacoes", "orcamentos", "conexoes_bancarias"):
+                conexao.execute(f"DELETE FROM {tabela} WHERE usuario_id = ?", (linha["id"],))
+            conexao.execute("DELETE FROM usuarios WHERE id = ?", (linha["id"],))
+
+        cursor = conexao.execute(
+            "INSERT INTO usuarios (nome, email, senha_hash) VALUES (?, ?, ?)",
+            ("Visitante", f"visitante-{secrets.token_hex(6)}@demo.local", generate_password_hash(secrets.token_hex(16))),
+        )
+        usuario_id = cursor.lastrowid
+        conexao.executemany(
+            """INSERT INTO transacoes (usuario_id, descricao, valor, tipo, categoria, data, origem)
+               VALUES (?, ?, ?, ?, ?, ?, 'exemplo')""",
+            [(usuario_id, *t) for t in gerar_transacoes_exemplo(semente=usuario_id)],
+        )
+        conexao.executemany(
+            "INSERT INTO orcamentos (usuario_id, categoria, limite) VALUES (?, ?, ?)",
+            [(usuario_id, "Alimentação", 900), (usuario_id, "Transporte", 250), (usuario_id, "Lazer", 200)],
+        )
+    session.clear()
+    session["usuario_id"] = usuario_id
+    session["nome"] = "Visitante"
+    return redirect(url_for("dashboard"))
 
 
 @app.route("/logout")

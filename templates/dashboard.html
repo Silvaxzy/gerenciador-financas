@@ -189,9 +189,15 @@
                         <span class="cartao-sub">Importe o histórico de transações via Open Finance (Pluggy)</span>
                     </header>
                     <div id="aviso-pluggy" class="aviso" hidden>
+                        {% if modo_demo %}
+                        Nesta demonstração online a conexão bancária está desativada, para proteger dados reais.
+                        O código da integração com a Pluggy está no
+                        <a href="https://github.com/Silvaxzy/gerenciador-financas" target="_blank" rel="noopener noreferrer">GitHub</a>.
+                        {% else %}
                         A integração ainda não está configurada. Crie uma conta em
                         <a href="https://dashboard.pluggy.ai" target="_blank" rel="noopener noreferrer">dashboard.pluggy.ai</a>,
                         copie o <code>CLIENT_ID</code> e o <code>CLIENT_SECRET</code> para o arquivo <code>.env</code> e reinicie o app.
+                        {% endif %}
                     </div>
                     <ul class="conexoes" id="lista-conexoes"></ul>
                     <p class="vazio" id="sem-conexoes">Nenhum banco conectado ainda.</p>
