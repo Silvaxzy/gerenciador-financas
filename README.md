@@ -2,6 +2,10 @@
 
 Aplicação web Full Stack para controle financeiro pessoal, com **integração Open Finance** para importar o histórico de transações direto do banco, **análises automáticas** e **orçamento por categoria**.
 
+🔗 **Demo online:** [gerenciador-financas-v9hh.onrender.com](https://gerenciador-financas-v9hh.onrender.com). Clique em **Entrar como visitante** para ver o painel com dados de exemplo.
+
+> Hospedado no plano gratuito do Render: o primeiro acesso pode levar cerca de 1 minuto para "acordar" o servidor.
+
 ![Painel](screenshots/painel.png)
 
 ## ✨ Funcionalidades
@@ -109,12 +113,20 @@ Na aba **Bancos**, clique em **Conectar banco**, escolha o **Pluggy Bank** (banc
 - Usuário: `user-ok`
 - Senha: `password-ok`
 
+### Deploy
+
+O projeto roda no [Render](https://render.com) com o servidor de produção **Gunicorn**:
+
+- **Build:** `pip install -r requirements.txt`
+- **Start:** `gunicorn app:app`
+- **Variáveis:** `SECRET_KEY` e `DEMO=1`. O modo demo mostra o botão de visitante e mantém a conexão bancária desativada.
+
 ## 📌 Próximas melhorias
 
 - [ ] Metas de economia
 - [ ] Importação de extrato em OFX
 - [ ] Webhooks da Pluggy para sincronização automática
-- [ ] Deploy online
+- [x] Deploy online
 
 ## 👤 Autor
 
