@@ -60,11 +60,27 @@ def cliente_pluggy():
     return _cliente_pluggy
 
 
+def sessao_valida():
+    """Confere se o usuário da sessão ainda existe no banco.
+
+    No Render gratuito o banco é apagado quando o servidor reinicia, mas o cookie
+    de login continua no navegador. Sem essa checagem, a sessão apontaria para um
+    usuário que não existe mais (ou para outra pessoa com o mesmo id).
+    """
+    usuario_id, email = session.get("usuario_id"), session.get("email")
+    if not usuario_id or not email:
+        return False
+    with conectar() as conexao:
+        linha = conexao.execute("SELECT email FROM usuarios WHERE id = ?", (usuario_id,)).fetchone()
+    return bool(linha) and linha["email"] == email
+
+
 def login_obrigatorio(rota):
     """Bloqueia a rota para quem não está logado."""
     @wraps(rota)
     def verificar(*args, **kwargs):
-        if "usuario_id" not in session:
+        if not sessao_valida():
+            session.clear()
             if request.path.startswith("/api/"):
                 return jsonify({"erro": "Faça login novamente."}), 401
             return redirect(url_for("login"))
@@ -122,7 +138,9 @@ def login():
             usuario = conexao.execute("SELECT * FROM usuarios WHERE email = ?", (email,)).fetchone()
 
         if usuario and check_password_hash(usuario["senha_hash"], senha):
+            session.clear()
             session["usuario_id"] = usuario["id"]
+            session["email"] = usuario["email"]
             session["nome"] = usuario["nome"]
             return redirect(url_for("dashboard"))
 
@@ -153,9 +171,10 @@ def entrar_demo():
                 conexao.execute(f"DELETE FROM {tabela} WHERE usuario_id = ?", (linha["id"],))
             conexao.execute("DELETE FROM usuarios WHERE id = ?", (linha["id"],))
 
+        email_visitante = f"visitante-{secrets.token_hex(6)}@demo.local"
         cursor = conexao.execute(
             "INSERT INTO usuarios (nome, email, senha_hash) VALUES (?, ?, ?)",
-            ("Visitante", f"visitante-{secrets.token_hex(6)}@demo.local", generate_password_hash(secrets.token_hex(16))),
+            ("Visitante", email_visitante, generate_password_hash(secrets.token_hex(16))),
         )
         usuario_id = cursor.lastrowid
         conexao.executemany(
@@ -169,6 +188,7 @@ def entrar_demo():
         )
     session.clear()
     session["usuario_id"] = usuario_id
+    session["email"] = email_visitante
     session["nome"] = "Visitante"
     return redirect(url_for("dashboard"))
 
