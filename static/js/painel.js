@@ -11,7 +11,11 @@ const estado = {
     mes: null,
     resumo: null,
     editandoId: null,
+    editando: null,
     graficos: {},
+    cartoes: [],
+    fatura: { cartaoId: null, mes: null, status: null },
+    editandoCartaoId: null,
 };
 
 const $ = (seletor) => document.querySelector(seletor);
@@ -86,7 +90,10 @@ function variacaoHTML(el, valor, inverter = false, comparacao = "mês anterior")
 
 // ---------------- abas ----------------
 
-const TITULOS = { visao: "Visão geral", transacoes: "Transações", orcamentos: "Orçamentos", conexoes: "Bancos conectados" };
+const TITULOS = {
+    visao: "Visão geral", transacoes: "Transações", orcamentos: "Orçamentos",
+    cartoes: "Cartões de crédito", conexoes: "Bancos conectados",
+};
 
 function abrirAba(aba) {
     estado.aba = aba;
@@ -96,6 +103,7 @@ function abrirAba(aba) {
     if (aba === "transacoes") carregarTransacoes();
     if (aba === "conexoes") carregarConexoes();
     if (aba === "orcamentos") renderOrcamentos();
+    if (aba === "cartoes") carregarCartoes().catch((e) => avisar(e.message, "erro"));
 }
 
 // ---------------- visão geral ----------------
@@ -191,7 +199,13 @@ function renderEvolucao(serie) {
             },
             scales: {
                 x: { grid: { display: false } },
-                y: { ticks: { callback: (v) => `R$ ${(v / 1000).toLocaleString("pt-BR")} mil` } },
+                y: {
+                    ticks: {
+                        callback: (v) => Math.abs(v) >= 1000
+                            ? `R$ ${(v / 1000).toLocaleString("pt-BR", { maximumFractionDigits: 1 })} mil`
+                            : `R$ ${v.toLocaleString("pt-BR")}`,
+                    },
+                },
             },
         },
     });
@@ -314,6 +328,17 @@ function renderTabela(lista) {
         etiquetaCat.textContent = t.categoria || "Outros";
         cat.append(etiquetaCat);
 
+        const pagamento = document.createElement("td");
+        const etiquetaPag = document.createElement("span");
+        if (t.forma_pagamento === "credito" && t.cartao_nome) {
+            etiquetaPag.className = "etiqueta credito";
+            etiquetaPag.textContent = `💳 ${t.cartao_nome}`;
+        } else {
+            etiquetaPag.className = "etiqueta conta";
+            etiquetaPag.textContent = t.tipo === "receita" ? "Conta" : "Conta / Pix";
+        }
+        pagamento.append(etiquetaPag);
+
         const origem = document.createElement("td");
         const etiquetaOrigem = document.createElement("span");
         etiquetaOrigem.className = `etiqueta ${t.origem}`;
@@ -343,17 +368,21 @@ function renderTabela(lista) {
         caixa.append(editar, excluir);
         acoes.append(caixa);
 
-        tr.append(data, desc, cat, origem, valor, acoes);
+        tr.append(data, desc, cat, pagamento, origem, valor, acoes);
         corpo.append(tr);
     });
 }
 
 async function excluirTransacao(t) {
-    if (!confirm(`Excluir "${t.descricao}"?`)) return;
+    const parcelada = t.total_parcelas > 1;
+    const pergunta = parcelada
+        ? `"${t.descricao}" é uma compra parcelada. Excluir todas as ${t.total_parcelas} parcelas?`
+        : `Excluir "${t.descricao}"?`;
+    if (!confirm(pergunta)) return;
     try {
-        await api(`/api/transacoes/${t.id}`, { method: "DELETE" });
-        avisar("Transação excluída.");
-        await Promise.all([carregarTransacoes(), carregarResumo()]);
+        const r = await api(`/api/transacoes/${t.id}${parcelada ? "?todas=1" : ""}`, { method: "DELETE" });
+        avisar(parcelada ? `${r.excluidas} parcelas excluídas.` : "Transação excluída.");
+        await Promise.all([carregarTransacoes(), carregarResumo(), carregarCartoes()]);
     } catch (e) {
         avisar(e.message, "erro");
     }
@@ -369,6 +398,13 @@ function abrirModal(t = null) {
     $("#data").value = t ? t.data : hojeISO();
     $("#categoria").value = t ? t.categoria || "Outros" : "Alimentação";
     document.querySelector(`input[name="tipo"][value="${t ? t.tipo : "despesa"}"]`).checked = true;
+    estado.editando = t;
+    $("#parcelas").innerHTML = "";
+    preencherSelectCartoes();
+    const credito = t ? t.forma_pagamento === "credito" && t.cartao_id : false;
+    document.querySelector(`input[name="forma"][value="${credito ? "credito" : "conta"}"]`).checked = true;
+    if (credito) $("#cartao-transacao").value = t.cartao_id;
+    atualizarPagamento();
     $("#mensagem-modal").textContent = "";
     $("#modal").showModal();
     $("#descricao").focus();
@@ -382,6 +418,9 @@ async function salvarTransacao(evento) {
         data: $("#data").value,
         categoria: $("#categoria").value,
         tipo: document.querySelector('input[name="tipo"]:checked').value,
+        forma_pagamento: document.querySelector('input[name="forma"]:checked').value,
+        cartao_id: $("#cartao-transacao").value || null,
+        parcelas: $("#parcelas").value || 1,
     };
     const botao = evento.target.querySelector("button[type=submit]");
     botao.disabled = true;
@@ -392,13 +431,335 @@ async function salvarTransacao(evento) {
             await api("/api/transacoes", { method: "POST", body: corpo });
         }
         $("#modal").close();
-        avisar(estado.editandoId ? "Transação atualizada." : "Transação adicionada.");
-        await carregarResumo();
+        const n = Number(corpo.parcelas);
+        avisar(estado.editandoId ? "Transação atualizada."
+            : corpo.forma_pagamento === "credito" && n > 1 ? `Compra lançada em ${n} parcelas.` : "Transação adicionada.");
+        await Promise.all([carregarResumo(), carregarCartoes()]);
         if (estado.aba === "transacoes") carregarTransacoes();
     } catch (e) {
         $("#mensagem-modal").textContent = e.message;
     } finally {
         botao.disabled = false;
+    }
+}
+
+// ---------------- forma de pagamento (modal de transação) ----------------
+
+function somarMeses(ano, mes, n) {
+    const total = ano * 12 + (mes - 1) + n;
+    return [Math.floor(total / 12), (total % 12) + 1];
+}
+
+function mesDaFatura(iso, fechamento, vencimento) {
+    // mesma regra do back-end (cartoes.py)
+    let [ano, mes, dia] = iso.split("-").map(Number);
+    if (dia >= fechamento) [ano, mes] = somarMeses(ano, mes, 1);
+    if (vencimento <= fechamento) [ano, mes] = somarMeses(ano, mes, 1);
+    return `${ano}-${String(mes).padStart(2, "0")}`;
+}
+
+function preencherSelectCartoes() {
+    const sel = $("#cartao-transacao");
+    const atual = sel.value;
+    sel.innerHTML = "";
+    estado.cartoes.forEach((c) => {
+        const op = document.createElement("option");
+        op.value = c.id;
+        op.textContent = c.nome;
+        sel.append(op);
+    });
+    if (atual && estado.cartoes.some((c) => String(c.id) === atual)) sel.value = atual;
+}
+
+function atualizarParcelas() {
+    const sel = $("#parcelas");
+    const valor = Number($("#valor").value) || 0;
+    const t = estado.editando;
+    if (t && t.total_parcelas > 1) {
+        // ao editar, muda só esta parcela
+        sel.innerHTML = `<option value="1">Parcela ${t.parcela} de ${t.total_parcelas}</option>`;
+        sel.disabled = true;
+        return;
+    }
+    if (t) {
+        sel.innerHTML = '<option value="1">À vista</option>';
+        sel.disabled = true;
+        return;
+    }
+    const escolhido = sel.value || "1";
+    sel.disabled = false;
+    sel.innerHTML = "";
+    for (let n = 1; n <= 24; n++) {
+        const op = document.createElement("option");
+        op.value = n;
+        op.textContent = n === 1 ? `À vista${valor ? ` · ${formatarMoeda(valor)}` : ""}` : `${n}x${valor ? ` de ${formatarMoeda(valor / n)}` : ""}`;
+        sel.append(op);
+    }
+    sel.value = escolhido;
+}
+
+function atualizarPagamento() {
+    const despesa = document.querySelector('input[name="tipo"]:checked').value === "despesa";
+    $("#bloco-pagamento").hidden = !despesa;
+    const credito = despesa && document.querySelector('input[name="forma"]:checked').value === "credito";
+    $("#bloco-cartao").hidden = !credito;
+    if (!credito) return;
+
+    atualizarParcelas();
+    const dica = $("#dica-cartao");
+    if (!estado.cartoes.length) {
+        dica.innerHTML = 'Você ainda não tem cartão cadastrado. <a href="#" id="link-novo-cartao">Cadastrar agora</a>';
+        $("#link-novo-cartao").addEventListener("click", (e) => {
+            e.preventDefault();
+            $("#modal").close();
+            abrirAba("cartoes");
+            abrirModalCartao();
+        });
+        return;
+    }
+    const cartao = estado.cartoes.find((c) => String(c.id) === $("#cartao-transacao").value);
+    const data = $("#data").value;
+    if (!cartao || !data) {
+        dica.textContent = "";
+        return;
+    }
+    const mes = mesDaFatura(data, cartao.dia_fechamento, cartao.dia_vencimento);
+    const n = Number($("#parcelas").value) || 1;
+    dica.textContent = n > 1 && !estado.editando
+        ? `1ª parcela na fatura de ${nomeMes(mes)}, as outras nos ${n - 1} meses seguintes.`
+        : `Entra na fatura de ${nomeMes(mes)} (vence dia ${cartao.dia_vencimento}).`;
+}
+
+// ---------------- cartões de crédito ----------------
+
+const STATUS_FATURA = { aberta: "Aberta", fechada: "Fechada · a pagar", vencida: "Vencida", paga: "Paga" };
+
+async function carregarCartoes() {
+    estado.cartoes = await api("/api/cartoes");
+    // filtro da aba Transações
+    const filtro = $("#filtro-pagamento");
+    const escolhido = filtro.value;
+    filtro.querySelectorAll("option[data-cartao]").forEach((o) => o.remove());
+    estado.cartoes.forEach((c) => {
+        const op = document.createElement("option");
+        op.value = c.id;
+        op.dataset.cartao = "1";
+        op.textContent = `💳 ${c.nome}`;
+        filtro.append(op);
+    });
+    filtro.value = escolhido;
+    preencherSelectCartoes();
+    if (estado.aba === "cartoes") renderCartoes();
+}
+
+function renderCartoes() {
+    const lista = $("#cartoes-lista");
+    lista.innerHTML = "";
+    $("#sem-cartoes").hidden = estado.cartoes.length > 0;
+    $("#painel-fatura").hidden = !estado.cartoes.length;
+    if (!estado.cartoes.length) return;
+
+    if (!estado.cartoes.some((c) => c.id === estado.fatura.cartaoId)) {
+        estado.fatura = { cartaoId: estado.cartoes[0].id, mes: null, status: null };
+    }
+
+    estado.cartoes.forEach((c) => {
+        const item = document.createElement("article");
+        item.className = `cc-item ${c.id === estado.fatura.cartaoId ? "ativo" : ""}`;
+
+        const plastico = document.createElement("button");
+        plastico.type = "button";
+        plastico.className = `cc cc-${c.cor}`;
+        plastico.setAttribute("aria-label", `Ver fatura do ${c.nome}`);
+        const chip = document.createElement("span");
+        chip.className = "cc-chip";
+        const nome = document.createElement("strong");
+        nome.className = "cc-nome";
+        nome.textContent = c.nome;
+        const rodape = document.createElement("div");
+        rodape.className = "cc-rodape";
+        rodape.innerHTML = `<span>Fecha dia ${c.dia_fechamento}</span><span>Vence dia ${c.dia_vencimento}</span>`;
+        plastico.append(chip, nome, rodape);
+        plastico.addEventListener("click", () => {
+            estado.fatura = { cartaoId: c.id, mes: null, status: null };
+            renderCartoes();
+        });
+
+        const editar = document.createElement("button");
+        editar.type = "button";
+        editar.className = "cc-editar";
+        editar.textContent = "✎";
+        editar.title = "Editar cartão";
+        editar.setAttribute("aria-label", `Editar ${c.nome}`);
+        editar.addEventListener("click", (e) => {
+            e.stopPropagation();
+            abrirModalCartao(c);
+        });
+        plastico.append(editar);
+
+        const info = document.createElement("div");
+        info.className = "cc-info";
+        const fatura = document.createElement("div");
+        fatura.className = "cc-linha";
+        fatura.innerHTML = `<span>Fatura atual (${STATUS_FATURA[c.fatura_atual.status].toLowerCase()})</span>`;
+        const totalFatura = document.createElement("strong");
+        totalFatura.textContent = formatarMoeda(c.fatura_atual.total);
+        fatura.append(totalFatura);
+
+        const barra = document.createElement("div");
+        const pct = c.percentual_usado;
+        barra.className = `barra ${pct >= 90 ? "alta" : pct >= 70 ? "media" : ""}`;
+        const preenchimento = document.createElement("span");
+        barra.append(preenchimento);
+        requestAnimationFrame(() => (preenchimento.style.width = `${Math.min(100, pct)}%`));
+
+        const limite = document.createElement("div");
+        limite.className = "cc-linha";
+        limite.innerHTML = `<span>Usado ${formatarMoeda(c.usado)}</span><span>Disponível ${formatarMoeda(c.disponivel)}</span>`;
+
+        info.append(fatura, barra, limite);
+        if (c.fatura_a_pagar) {
+            const f = c.fatura_a_pagar;
+            const alerta = document.createElement("div");
+            alerta.className = `cc-alerta ${f.status === "vencida" ? "vencida" : ""}`;
+            alerta.textContent = f.status === "vencida"
+                ? `Fatura de ${nomeMes(f.mes)} vencida: ${formatarMoeda(f.total)}`
+                : `Fatura de ${nomeMes(f.mes)} a pagar: ${formatarMoeda(f.total)} até ${formatarData(f.vencimento)}`;
+            info.append(alerta);
+        }
+
+        item.append(plastico, info);
+        lista.append(item);
+    });
+
+    carregarFatura();
+}
+
+async function carregarFatura() {
+    const { cartaoId, mes } = estado.fatura;
+    const cartao = estado.cartoes.find((c) => c.id === cartaoId);
+    if (!cartao) return;
+    try {
+        const f = await api(`/api/cartoes/${cartaoId}/fatura${mes ? `?mes=${mes}` : ""}`);
+        estado.fatura.mes = f.mes;
+        estado.fatura.status = f.status;
+        $("#fatura-titulo").textContent = `Fatura · ${cartao.nome}`;
+        $("#fatura-mes").textContent = nomeMes(f.mes);
+        $("#fatura-periodo").textContent = `Compras de ${formatarData(f.inicio)} até a véspera de ${formatarData(f.fechamento)} (fechamento)`;
+        $("#fatura-total").textContent = formatarMoeda(f.total);
+        $("#fatura-vencimento").textContent = formatarData(f.vencimento);
+        const status = $("#fatura-status");
+        status.className = `status-fatura ${f.status}`;
+        status.textContent = STATUS_FATURA[f.status];
+        const pagar = $("#fatura-pagar");
+        pagar.textContent = f.status === "paga" ? "Desmarcar pagamento" : "Marcar como paga";
+        pagar.hidden = f.total === 0 && f.status !== "paga";
+
+        const ul = $("#fatura-compras");
+        ul.innerHTML = "";
+        $("#fatura-vazia").hidden = f.compras.length > 0;
+        f.compras.forEach((c) => {
+            const li = document.createElement("li");
+            const data = document.createElement("span");
+            data.className = "data-compra";
+            data.textContent = formatarData(c.data).slice(0, 5);
+            const info = document.createElement("div");
+            const nome = document.createElement("strong");
+            nome.textContent = c.descricao;
+            const sub = document.createElement("small");
+            sub.textContent = c.total_parcelas ? `${c.categoria} · parcela ${c.parcela} de ${c.total_parcelas}` : c.categoria;
+            info.append(nome, sub);
+            const valor = document.createElement("span");
+            valor.className = "valor";
+            valor.textContent = formatarMoeda(c.valor);
+            li.append(data, info, valor);
+            ul.append(li);
+        });
+    } catch (e) {
+        avisar(e.message, "erro");
+    }
+}
+
+function navegarFatura(passo) {
+    if (!estado.fatura.mes) return;
+    const [ano, mes] = estado.fatura.mes.split("-").map(Number);
+    const [a, m] = somarMeses(ano, mes, passo);
+    estado.fatura.mes = `${a}-${String(m).padStart(2, "0")}`;
+    carregarFatura();
+}
+
+async function alternarPagamentoFatura() {
+    const { cartaoId, mes, status } = estado.fatura;
+    try {
+        await api(`/api/cartoes/${cartaoId}/fatura/${mes}/pagamento`, { method: status === "paga" ? "DELETE" : "PUT" });
+        avisar(status === "paga" ? "Pagamento desmarcado." : "Fatura marcada como paga. O limite foi liberado.");
+        await Promise.all([carregarCartoes(), carregarResumo()]);
+    } catch (e) {
+        avisar(e.message, "erro");
+    }
+}
+
+function atualizarPreviaCartao() {
+    const cor = document.querySelector('input[name="cor"]:checked').value;
+    $("#cc-previa").className = `cc cc-previa cc-${cor}`;
+    $("#cc-previa-nome").textContent = $("#cartao-nome").value || "Meu cartão";
+    $("#cc-previa-limite").textContent = `Limite ${formatarMoeda($("#cartao-limite").value)}`;
+}
+
+function abrirModalCartao(c = null) {
+    estado.editandoCartaoId = c ? c.id : null;
+    $("#titulo-modal-cartao").textContent = c ? "Editar cartão" : "Novo cartão";
+    $("#cartao-nome").value = c ? c.nome : "";
+    $("#cartao-limite").value = c ? c.limite : "";
+    $("#cartao-fechamento").value = c ? c.dia_fechamento : "";
+    $("#cartao-vencimento").value = c ? c.dia_vencimento : "";
+    const cor = document.querySelector(`input[name="cor"][value="${c ? c.cor : "roxo"}"]`) || document.querySelector('input[name="cor"]');
+    cor.checked = true;
+    $("#excluir-cartao").hidden = !c;
+    $("#mensagem-cartao").textContent = "";
+    atualizarPreviaCartao();
+    $("#modal-cartao").showModal();
+    $("#cartao-nome").focus();
+}
+
+async function salvarCartao(evento) {
+    evento.preventDefault();
+    const corpo = {
+        nome: $("#cartao-nome").value,
+        limite: $("#cartao-limite").value,
+        dia_fechamento: $("#cartao-fechamento").value,
+        dia_vencimento: $("#cartao-vencimento").value,
+        cor: document.querySelector('input[name="cor"]:checked').value,
+    };
+    const botao = evento.target.querySelector("button[type=submit]");
+    botao.disabled = true;
+    try {
+        if (estado.editandoCartaoId) {
+            await api(`/api/cartoes/${estado.editandoCartaoId}`, { method: "PUT", body: corpo });
+        } else {
+            const r = await api("/api/cartoes", { method: "POST", body: corpo });
+            estado.fatura = { cartaoId: r.id, mes: null, status: null };
+        }
+        $("#modal-cartao").close();
+        avisar(estado.editandoCartaoId ? "Cartão atualizado." : "Cartão cadastrado!");
+        await carregarCartoes();
+    } catch (e) {
+        $("#mensagem-cartao").textContent = e.message;
+    } finally {
+        botao.disabled = false;
+    }
+}
+
+async function excluirCartao() {
+    const c = estado.cartoes.find((x) => x.id === estado.editandoCartaoId);
+    if (!c || !confirm(`Excluir o cartão ${c.nome}? As compras continuam salvas como despesas, só deixam de ficar ligadas ao cartão.`)) return;
+    try {
+        await api(`/api/cartoes/${c.id}`, { method: "DELETE" });
+        $("#modal-cartao").close();
+        avisar("Cartão excluído.");
+        await Promise.all([carregarCartoes(), carregarResumo()]);
+    } catch (e) {
+        $("#mensagem-cartao").textContent = e.message;
     }
 }
 
@@ -570,7 +931,7 @@ async function dadosExemplo(carregar) {
         await api("/api/exemplo", { method: carregar ? "POST" : "DELETE" });
         avisar(carregar ? "Dados de exemplo carregados." : "Dados de exemplo removidos.");
         estado.mes = null;
-        await carregarResumo();
+        await Promise.all([carregarResumo(), carregarCartoes()]);
         if (carregar) abrirAba("visao");
     } catch (e) {
         avisar(e.message, "erro");
@@ -593,6 +954,22 @@ function iniciar() {
     $("#nova-transacao").addEventListener("click", () => abrirModal());
     $("#fechar-modal").addEventListener("click", () => $("#modal").close());
     $("#form-transacao").addEventListener("submit", salvarTransacao);
+    document.querySelectorAll('input[name="tipo"], input[name="forma"]').forEach((r) => r.addEventListener("change", atualizarPagamento));
+    ["#cartao-transacao", "#data", "#parcelas"].forEach((s) => $(s).addEventListener("change", atualizarPagamento));
+    $("#valor").addEventListener("input", () => {
+        if (!$("#bloco-cartao").hidden) atualizarParcelas();
+    });
+
+    $("#novo-cartao").addEventListener("click", () => abrirModalCartao());
+    $("#novo-cartao-vazio").addEventListener("click", () => abrirModalCartao());
+    $("#fechar-modal-cartao").addEventListener("click", () => $("#modal-cartao").close());
+    $("#form-cartao").addEventListener("submit", salvarCartao);
+    $("#excluir-cartao").addEventListener("click", excluirCartao);
+    ["#cartao-nome", "#cartao-limite"].forEach((s) => $(s).addEventListener("input", atualizarPreviaCartao));
+    document.querySelectorAll('input[name="cor"]').forEach((r) => r.addEventListener("change", atualizarPreviaCartao));
+    $("#fatura-anterior").addEventListener("click", () => navegarFatura(-1));
+    $("#fatura-proxima").addEventListener("click", () => navegarFatura(1));
+    $("#fatura-pagar").addEventListener("click", alternarPagamentoFatura);
 
     $("#mes").addEventListener("change", (e) => {
         if (!e.target.value) return;
@@ -615,6 +992,7 @@ function iniciar() {
     $("#apagar-exemplo").addEventListener("click", () => dadosExemplo(false));
 
     carregarResumo().catch((e) => avisar(e.message, "erro"));
+    carregarCartoes().catch((e) => avisar(e.message, "erro"));
 }
 
 iniciar();

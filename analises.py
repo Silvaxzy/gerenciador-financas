@@ -71,6 +71,8 @@ def resumo(con, usuario_id, ano_mes):
     # no mês atual, compara com o MESMO período do mês anterior (dia 1 até hoje)
     ate_dia = hoje.day if mes_corrente else 31
     receitas_ant, despesas_ant = _totais_mes(con, usuario_id, mes_ant, ate_dia)
+    # o que já aconteceu até hoje (parcelas futuras do cartão podem já estar lançadas no mês)
+    receitas_hoje, despesas_hoje = _totais_mes(con, usuario_id, ano_mes, ate_dia)
 
     # ---- série dos últimos 12 meses ----
     serie = []
@@ -82,8 +84,11 @@ def resumo(con, usuario_id, ano_mes):
     # ---- ritmo de gastos e projeção do mês ----
     dias_no_mes = calendar.monthrange(ano, mes)[1]
     dias_passados = hoje.day if mes_corrente else dias_no_mes
-    media_diaria = despesas / dias_passados if dias_passados else 0
-    projecao = media_diaria * dias_no_mes if mes_corrente else despesas
+    media_diaria = despesas_hoje / dias_passados if dias_passados else 0
+    if mes_corrente:
+        projecao = _projetar_gastos(con, usuario_id, ano_mes, hoje.day, despesas, despesas_hoje, media_diaria, dias_no_mes)
+    else:
+        projecao = despesas
 
     saldo_total = con.execute(
         """SELECT COALESCE(SUM(CASE WHEN tipo = 'receita' THEN valor ELSE -valor END), 0) AS s
@@ -96,12 +101,13 @@ def resumo(con, usuario_id, ano_mes):
     # ---- categorias ----
     cats = _gastos_por_categoria(con, usuario_id, ano_mes)
     cats_ant = _gastos_por_categoria(con, usuario_id, mes_ant, ate_dia)
+    cats_hoje = _gastos_por_categoria(con, usuario_id, ano_mes, ate_dia) if mes_corrente else cats
     categorias = [
         {
             "categoria": c,
             "total": round(v, 2),
             "percentual": round(v / despesas * 100, 1) if despesas else 0,
-            "variacao": _variacao(v, cats_ant.get(c, 0)),
+            "variacao": _variacao(cats_hoje.get(c, 0), cats_ant.get(c, 0)),
         }
         for c, v in cats.items()
     ]
@@ -144,8 +150,8 @@ def resumo(con, usuario_id, ano_mes):
             "despesas": round(despesas, 2),
             "saldo_mes": round(receitas - despesas, 2),
             "saldo_total": round(float(saldo_total), 2),
-            "variacao_receitas": _variacao(receitas, receitas_ant),
-            "variacao_despesas": _variacao(despesas, despesas_ant),
+            "variacao_receitas": _variacao(receitas_hoje, receitas_ant),
+            "variacao_despesas": _variacao(despesas_hoje, despesas_ant),
             "taxa_poupanca": taxa_poupanca,
             "media_diaria": round(media_diaria, 2),
             "projecao_mes": round(projecao, 2),
@@ -158,6 +164,26 @@ def resumo(con, usuario_id, ano_mes):
         "orcamentos": orcamentos,
         "insights": insights,
     }
+
+
+def _projetar_gastos(con, usuario_id, ano_mes, dia_hoje, despesas, despesas_hoje, media_diaria, dias_no_mes):
+    """Estimativa de quanto o mês vai fechar.
+
+    Soma o que já foi gasto até hoje com o que costuma ser gasto no resto do mês
+    (média dos 3 meses anteriores, do dia seguinte até o fim). Se já houver despesas
+    agendadas maiores que isso (ex.: parcelas do cartão), usa as agendadas.
+    Sem histórico, projeta o ritmo diário atual.
+    """
+    agendado = despesas - despesas_hoje
+    restantes = []
+    for i in (1, 2, 3):
+        m = _mes_anterior(ano_mes, i)
+        total = _totais_mes(con, usuario_id, m)[1]
+        if total > 0:
+            restantes.append(total - _totais_mes(con, usuario_id, m, dia_hoje)[1])
+    if restantes:
+        return despesas_hoje + max(agendado, sum(restantes) / len(restantes))
+    return max(despesas, media_diaria * dias_no_mes)
 
 
 def _brl(valor):

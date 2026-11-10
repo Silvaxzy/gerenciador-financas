@@ -58,6 +58,12 @@ def criar_tabelas():
             "origem": "TEXT NOT NULL DEFAULT 'manual'",  # manual | banco | exemplo
             "id_externo": "TEXT",                         # id da transação no banco (Pluggy)
             "conta": "TEXT",                              # nome da conta de origem
+            # versão 2.1: cartão de crédito
+            "forma_pagamento": "TEXT NOT NULL DEFAULT 'conta'",  # conta | credito
+            "cartao_id": "INTEGER",
+            "parcela": "INTEGER",          # número da parcela (1, 2, 3...)
+            "total_parcelas": "INTEGER",
+            "compra_id": "TEXT",           # liga as parcelas de uma mesma compra
         }
         for coluna, definicao in novas.items():
             if coluna not in existentes:
@@ -77,6 +83,31 @@ def criar_tabelas():
                 limite REAL NOT NULL CHECK (limite > 0),
                 PRIMARY KEY (usuario_id, categoria),
                 FOREIGN KEY (usuario_id) REFERENCES usuarios (id)
+            )
+        """)
+
+        conexao.execute("CREATE INDEX IF NOT EXISTS ix_transacao_cartao ON transacoes (cartao_id, data)")
+
+        conexao.execute("""
+            CREATE TABLE IF NOT EXISTS cartoes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                usuario_id INTEGER NOT NULL,
+                nome TEXT NOT NULL,
+                limite REAL NOT NULL CHECK (limite >= 0),
+                dia_fechamento INTEGER NOT NULL CHECK (dia_fechamento BETWEEN 1 AND 28),
+                dia_vencimento INTEGER NOT NULL CHECK (dia_vencimento BETWEEN 1 AND 28),
+                cor TEXT NOT NULL DEFAULT 'roxo',
+                exemplo INTEGER NOT NULL DEFAULT 0,
+                FOREIGN KEY (usuario_id) REFERENCES usuarios (id)
+            )
+        """)
+        conexao.execute("""
+            CREATE TABLE IF NOT EXISTS faturas_pagas (
+                cartao_id INTEGER NOT NULL,
+                mes TEXT NOT NULL,  -- mês de vencimento da fatura (AAAA-MM)
+                pago_em TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+                PRIMARY KEY (cartao_id, mes),
+                FOREIGN KEY (cartao_id) REFERENCES cartoes (id) ON DELETE CASCADE
             )
         """)
 

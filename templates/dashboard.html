@@ -20,6 +20,10 @@
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 10 10H12z"/><path d="M14 2.2V10h7.8A10 10 0 0 0 14 2.2z" opacity=".55"/></svg>
                 <span>Orçamentos</span>
             </button>
+            <button class="menu-item" data-aba="cartoes">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zm-1 4v2h20V9zm3 6v1.5h5V15z" fill-rule="evenodd"/></svg>
+                <span>Cartões</span>
+            </button>
             <button class="menu-item" data-aba="conexoes">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10l9-6 9 6v1H3zm2 2h2v6H5zm4 0h2v6H9zm4 0h2v6h-2zm4 0h2v6h-2zM3 20h18v2H3z"/></svg>
                 <span>Bancos</span>
@@ -134,6 +138,11 @@
                     <option value="">Todas as categorias</option>
                     {% for c in categorias %}<option>{{ c }}</option>{% endfor %}
                 </select>
+                <select name="pagamento" aria-label="Forma de pagamento" id="filtro-pagamento">
+                    <option value="">Todos os pagamentos</option>
+                    <option value="conta">Conta / Pix / Débito</option>
+                    <option value="credito">Cartão de crédito</option>
+                </select>
                 <select name="origem" aria-label="Origem">
                     <option value="">Todas as origens</option>
                     <option value="manual">Manual</option>
@@ -157,6 +166,7 @@
                                 <th>Data</th>
                                 <th>Descrição</th>
                                 <th>Categoria</th>
+                                <th>Pagamento</th>
                                 <th>Origem</th>
                                 <th class="direita">Valor</th>
                                 <th><span class="sr-only">Ações</span></th>
@@ -177,6 +187,53 @@
                     <span class="cartao-sub">Defina um limite e acompanhe o quanto já foi gasto no mês selecionado</span>
                 </header>
                 <ul class="orcamentos" id="orcamentos"></ul>
+            </article>
+        </section>
+
+        <!-- ---------- Cartões de crédito ---------- -->
+        <section class="aba" id="aba-cartoes" hidden>
+            <div class="cartoes-topo">
+                <p class="texto-suave">Acompanhe o limite e a fatura de cada cartão. As compras contam como despesa no mês em que são feitas (cada parcela no seu mês).</p>
+                <button class="botao botao-secundario" id="novo-cartao"><span aria-hidden="true">+</span> Novo cartão</button>
+            </div>
+
+            <div class="cartoes-lista" id="cartoes-lista"></div>
+            <article class="cartao vazio-cartoes" id="sem-cartoes" hidden>
+                <div class="cc-fantasma" aria-hidden="true"></div>
+                <h2>Nenhum cartão cadastrado</h2>
+                <p class="texto-suave">Cadastre seu cartão de crédito para lançar compras parceladas e acompanhar a fatura.</p>
+                <button class="botao botao-primario" id="novo-cartao-vazio">Cadastrar cartão</button>
+            </article>
+
+            <article class="cartao" id="painel-fatura" hidden>
+                <header class="cartao-topo fatura-topo">
+                    <div>
+                        <h2 id="fatura-titulo">Fatura</h2>
+                        <span class="cartao-sub" id="fatura-periodo"></span>
+                    </div>
+                    <div class="navegar-fatura">
+                        <button class="icone-botao" id="fatura-anterior" aria-label="Fatura anterior">‹</button>
+                        <strong id="fatura-mes"></strong>
+                        <button class="icone-botao" id="fatura-proxima" aria-label="Próxima fatura">›</button>
+                    </div>
+                </header>
+                <div class="fatura-resumo">
+                    <div>
+                        <span class="kpi-titulo">Total da fatura</span>
+                        <strong id="fatura-total">R$ 0,00</strong>
+                    </div>
+                    <div>
+                        <span class="kpi-titulo">Vencimento</span>
+                        <strong id="fatura-vencimento">—</strong>
+                    </div>
+                    <div>
+                        <span class="kpi-titulo">Situação</span>
+                        <span class="status-fatura" id="fatura-status"></span>
+                    </div>
+                    <button class="botao botao-secundario" id="fatura-pagar">Marcar como paga</button>
+                </div>
+                <ul class="fatura-compras" id="fatura-compras"></ul>
+                <p class="vazio" id="fatura-vazia" hidden>Nenhuma compra nesta fatura.</p>
             </article>
         </section>
 
@@ -260,8 +317,74 @@
             {% for c in categorias %}<option>{{ c }}</option>{% endfor %}
         </select>
 
+        <div id="bloco-pagamento">
+            <span class="rotulo">Forma de pagamento</span>
+            <div class="tipo-alternar pagamento-alternar" role="radiogroup" aria-label="Forma de pagamento">
+                <label><input type="radio" name="forma" value="conta" checked><span>Conta / Pix / Débito</span></label>
+                <label><input type="radio" name="forma" value="credito"><span>Cartão de crédito</span></label>
+            </div>
+            <div id="bloco-cartao" hidden>
+                <div class="duas-colunas">
+                    <div>
+                        <label for="cartao-transacao">Cartão</label>
+                        <select id="cartao-transacao"></select>
+                    </div>
+                    <div>
+                        <label for="parcelas">Parcelas</label>
+                        <select id="parcelas"></select>
+                    </div>
+                </div>
+                <p class="dica" id="dica-cartao"></p>
+            </div>
+        </div>
+
         <p class="mensagem" id="mensagem-modal" role="status"></p>
         <button type="submit" class="botao botao-primario largura-total">Salvar</button>
+    </form>
+</dialog>
+
+<!-- ================= Modal de cartão ================= -->
+<dialog class="modal" id="modal-cartao">
+    <form id="form-cartao" method="dialog">
+        <header class="cartao-topo">
+            <h2 id="titulo-modal-cartao">Novo cartão</h2>
+            <button type="button" class="fechar" id="fechar-modal-cartao" aria-label="Fechar">✕</button>
+        </header>
+
+        <div class="cc cc-previa" id="cc-previa">
+            <span class="cc-chip" aria-hidden="true"></span>
+            <strong class="cc-nome" id="cc-previa-nome">Meu cartão</strong>
+            <span class="cc-limite" id="cc-previa-limite">Limite R$ 0,00</span>
+        </div>
+
+        <label for="cartao-nome">Nome do cartão</label>
+        <input type="text" id="cartao-nome" maxlength="40" placeholder="Ex: Nubank, Inter, Itaú" required>
+
+        <label for="cartao-limite">Limite (R$)</label>
+        <input type="number" id="cartao-limite" step="0.01" min="0" placeholder="0,00" required>
+
+        <div class="duas-colunas">
+            <div>
+                <label for="cartao-fechamento">Dia do fechamento</label>
+                <input type="number" id="cartao-fechamento" min="1" max="28" placeholder="Ex: 3" required>
+            </div>
+            <div>
+                <label for="cartao-vencimento">Dia do vencimento</label>
+                <input type="number" id="cartao-vencimento" min="1" max="28" placeholder="Ex: 10" required>
+            </div>
+        </div>
+        <p class="dica">Compras feitas a partir do dia do fechamento entram na fatura seguinte.</p>
+
+        <span class="rotulo">Cor</span>
+        <div class="cores-cartao" role="radiogroup" aria-label="Cor do cartão">
+            {% for cor in cores_cartao %}
+            <label><input type="radio" name="cor" value="{{ cor }}" {% if loop.first %}checked{% endif %}><span class="cor-amostra cc-{{ cor }}" title="{{ cor | capitalize }}"></span></label>
+            {% endfor %}
+        </div>
+
+        <p class="mensagem" id="mensagem-cartao" role="status"></p>
+        <button type="submit" class="botao botao-primario largura-total">Salvar cartão</button>
+        <button type="button" class="botao botao-fantasma largura-total perigo-texto" id="excluir-cartao" hidden>Excluir cartão</button>
     </form>
 </dialog>
 

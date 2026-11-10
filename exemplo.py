@@ -52,3 +52,60 @@ def gerar_transacoes_exemplo(semente=42):
             add(dia(25), "Aplicação Tesouro Selic", rand.choice([150, 200, 300]), "despesa", "Investimentos")
 
     return lista
+
+
+# compras do exemplo que passam a ser feitas no cartão de crédito
+COMPRAS_NO_CARTAO = (
+    "iFood", "Restaurante", "Uber", "99", "Streaming", "Cinema", "Show", "Bar com amigos",
+    "Loja de roupas", "Eletrônicos", "Compra online", "Farmácia", "Plano de celular",
+)
+
+
+def criar_cartao_exemplo(conexao, usuario_id):
+    """Cria um cartão fictício, move parte das compras do exemplo para ele e adiciona compras parceladas."""
+    from cartoes import gerar_parcelas, mes_da_fatura  # import local evita dependência circular
+
+    fechamento, vencimento = 3, 10
+    cartao_id = conexao.execute(
+        """INSERT INTO cartoes (usuario_id, nome, limite, dia_fechamento, dia_vencimento, cor, exemplo)
+           VALUES (?, 'Nubank', 6000, ?, ?, 'roxo', 1)""",
+        (usuario_id, fechamento, vencimento),
+    ).lastrowid
+
+    marcadores = ",".join("?" * len(COMPRAS_NO_CARTAO))
+    conexao.execute(
+        f"""UPDATE transacoes SET forma_pagamento = 'credito', cartao_id = ?
+            WHERE usuario_id = ? AND origem = 'exemplo' AND tipo = 'despesa' AND descricao IN ({marcadores})""",
+        (cartao_id, usuario_id, *COMPRAS_NO_CARTAO),
+    )
+
+    hoje = date.today()
+
+    def meses_atras(n, dia):
+        total = hoje.year * 12 + hoje.month - 1 - n
+        ano, mes = total // 12, total % 12 + 1
+        return date(ano, mes, min(dia, calendar.monthrange(ano, mes)[1])).isoformat()
+
+    for descricao, valor, categoria, data_compra, vezes in (
+        ("Curso de inglês online", 899.40, "Educação", meses_atras(4, 6), 6),
+        ("Fone de ouvido bluetooth", 299.70, "Compras", meses_atras(1, 20), 3),
+    ):
+        for p in gerar_parcelas(descricao, valor, data_compra, vezes):
+            conexao.execute(
+                """INSERT INTO transacoes (usuario_id, descricao, valor, tipo, categoria, data, origem,
+                                           forma_pagamento, cartao_id, parcela, total_parcelas, compra_id)
+                   VALUES (?, ?, ?, 'despesa', ?, ?, 'exemplo', 'credito', ?, ?, ?, ?)""",
+                (usuario_id, p["descricao"], p["valor"], categoria, p["data"], cartao_id,
+                 p["parcela"], p["total_parcelas"], p["compra_id"]),
+            )
+
+    # faturas que já venceram ficam como pagas
+    meses = {
+        mes_da_fatura(l["data"], fechamento, vencimento)
+        for l in conexao.execute("SELECT data FROM transacoes WHERE cartao_id = ?", (cartao_id,))
+    }
+    for mes in meses:
+        ano, m = map(int, mes.split("-"))
+        if date(ano, m, vencimento) < hoje:
+            conexao.execute("INSERT INTO faturas_pagas (cartao_id, mes) VALUES (?, ?)", (cartao_id, mes))
+    return cartao_id

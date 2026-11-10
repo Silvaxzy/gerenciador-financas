@@ -25,6 +25,13 @@ Aplicação web Full Stack para controle financeiro pessoal, com **integração 
 - **Insights automáticos**: alerta de gastos acima da média, categoria que mais subiu, orçamento estourado
 - Ranking das maiores despesas
 
+**Cartão de crédito**
+- Cadastro de cartões com limite, dia de fechamento e dia de vencimento
+- Compras à vista ou **parceladas em até 24x** (cada parcela entra no mês certo)
+- Fatura de cada mês, com navegação entre faturas e status: aberta, fechada, vencida ou paga
+- Limite usado e disponível, liberado ao marcar a fatura como paga
+- Alertas de fatura perto do vencimento e de limite quase no fim
+
 **Gestão**
 - Cadastro e login com senha criptografada (hash)
 - Criar, editar e excluir transações
@@ -39,6 +46,10 @@ Aplicação web Full Stack para controle financeiro pessoal, com **integração 
 | Transações | Orçamentos |
 |---|---|
 | ![Transações](screenshots/transacoes.png) | ![Orçamentos](screenshots/orcamentos.png) |
+
+| Cartões de crédito | |
+|---|---|
+| ![Cartões](screenshots/cartoes.png) | |
 
 | Bancos (Open Finance) | Login |
 |---|---|
@@ -60,6 +71,7 @@ Aplicação web Full Stack para controle financeiro pessoal, com **integração 
 app.py        → rotas das páginas e da API REST
 analises.py   → cálculos de indicadores, séries e insights
 pluggy.py     → cliente da API da Pluggy e conversão das transações
+cartoes.py    → regras de fatura, parcelamento e limite do cartão
 database.py   → criação e migração das tabelas
 exemplo.py    → gerador de dados de demonstração
 ```
@@ -72,6 +84,10 @@ As credenciais da Pluggy ficam **só no servidor**. O navegador recebe apenas um
 | GET | `/api/transacoes` | Lista com filtros |
 | POST / PUT / DELETE | `/api/transacoes[/<id>]` | Criar, editar e excluir |
 | PUT | `/api/orcamentos` | Definir limite por categoria |
+| GET / POST | `/api/cartoes` | Listar (com limite e fatura atual) e cadastrar cartões |
+| PUT / DELETE | `/api/cartoes/<id>` | Editar e excluir cartão |
+| GET | `/api/cartoes/<id>/fatura?mes=AAAA-MM` | Compras de uma fatura |
+| PUT / DELETE | `/api/cartoes/<id>/fatura/<mes>/pagamento` | Marcar ou desmarcar fatura como paga |
 | GET | `/api/exportar.csv` | Exportar para CSV |
 | POST | `/api/pluggy/token` | Gera o connect token do widget |
 | POST | `/api/pluggy/conexoes` | Importa o histórico de um banco conectado |
