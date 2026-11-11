@@ -312,6 +312,7 @@ button.cc:hover { transform: translateY(-3px); }
 .status-fatura.aberta { background: rgba(56, 189, 248, 0.12); color: var(--azul); }
 .status-fatura.fechada { background: rgba(245, 158, 11, 0.12); color: var(--amarelo); }
 .status-fatura.vencida { background: rgba(244, 63, 94, 0.14); color: #fda4af; }
+.status-fatura.sem_compras { background: rgba(255, 255, 255, 0.06); color: var(--suave); }
 .status-fatura.paga { background: rgba(16, 185, 129, 0.14); color: var(--verde-claro); }
 .fatura-compras { list-style: none; display: grid; }
 .fatura-compras li { display: grid; grid-template-columns: 64px 1fr auto; gap: 12px; align-items: center; padding: 11px 6px; border-bottom: 1px solid rgba(255, 255, 255, 0.04); font-size: 14px; }

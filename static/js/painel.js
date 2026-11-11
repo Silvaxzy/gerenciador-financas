@@ -124,7 +124,9 @@ function renderResumo(r) {
     const saldo = $("#kpi-saldo");
     saldo.textContent = formatarMoeda(k.saldo_mes);
     saldo.classList.toggle("negativo", k.saldo_mes < 0);
-    $("#kpi-saldo-total").textContent = `Saldo acumulado: ${formatarMoeda(k.saldo_total)}`;
+    $("#kpi-saldo-total").textContent = k.cartao_a_pagar > 0
+        ? `Em conta: ${formatarMoeda(k.saldo_total)} · Cartão a pagar: ${formatarMoeda(k.cartao_a_pagar)}`
+        : `Saldo em conta: ${formatarMoeda(k.saldo_total)}`;
 
     $("#kpi-receitas").textContent = formatarMoeda(k.receitas);
     $("#kpi-despesas").textContent = formatarMoeda(k.despesas);
@@ -532,7 +534,9 @@ function atualizarPagamento() {
 
 // ---------------- cartões de crédito ----------------
 
-const STATUS_FATURA = { aberta: "Aberta", fechada: "Fechada · a pagar", vencida: "Vencida", paga: "Paga" };
+const STATUS_FATURA = {
+    aberta: "Aberta", fechada: "Fechada · a pagar", vencida: "Vencida", paga: "Paga", sem_compras: "Sem compras",
+};
 
 async function carregarCartoes() {
     estado.cartoes = await api("/api/cartoes");

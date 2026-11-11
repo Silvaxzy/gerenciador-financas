@@ -45,6 +45,16 @@ def _gastos_por_categoria(con, usuario_id, ano_mes, ate_dia=31):
     return {l["categoria"]: float(l["total"]) for l in linhas}
 
 
+def _saida_conta_mes(con, usuario_id, ano_mes, pagamentos):
+    """Despesas pagas pela conta (Pix/débito) + faturas de cartão pagas no mês."""
+    linha = con.execute(
+        """SELECT COALESCE(SUM(valor), 0) AS total FROM transacoes
+           WHERE usuario_id = ? AND tipo = 'despesa' AND forma_pagamento = 'conta' AND substr(data, 1, 7) = ?""",
+        (usuario_id, ano_mes),
+    ).fetchone()
+    return float(linha["total"]) + sum(p["valor"] for p in pagamentos if p["data"][:7] == ano_mes)
+
+
 def mes_padrao(con, usuario_id):
     """Mês atual; se ele estiver vazio, o último mês com dados."""
     atual = date.today().strftime("%Y-%m")
@@ -62,6 +72,9 @@ def mes_padrao(con, usuario_id):
 
 
 def resumo(con, usuario_id, ano_mes):
+    from cartoes import pagamentos_de_fatura, resumo_cartao
+
+    pagamentos = pagamentos_de_fatura(con, usuario_id)
     receitas, despesas = _totais_mes(con, usuario_id, ano_mes)
     mes_ant = _mes_anterior(ano_mes)
 
@@ -79,7 +92,8 @@ def resumo(con, usuario_id, ano_mes):
     for i in range(11, -1, -1):
         m = _mes_anterior(ano_mes, i)
         r, d = _totais_mes(con, usuario_id, m)
-        serie.append({"mes": m, "receitas": round(r, 2), "despesas": round(d, 2), "saldo": round(r - d, 2)})
+        saldo_caixa = r - _saida_conta_mes(con, usuario_id, m, pagamentos)
+        serie.append({"mes": m, "receitas": round(r, 2), "despesas": round(d, 2), "saldo": round(saldo_caixa, 2)})
 
     # ---- ritmo de gastos e projeção do mês ----
     dias_no_mes = calendar.monthrange(ano, mes)[1]
@@ -90,11 +104,24 @@ def resumo(con, usuario_id, ano_mes):
     else:
         projecao = despesas
 
+    # saldo em conta: compras no crédito só saem da conta quando a fatura é paga
+    fim_mes = date(ano, mes, dias_no_mes).isoformat()
     saldo_total = con.execute(
-        """SELECT COALESCE(SUM(CASE WHEN tipo = 'receita' THEN valor ELSE -valor END), 0) AS s
+        """SELECT COALESCE(SUM(CASE WHEN tipo = 'receita' THEN valor
+                                    WHEN forma_pagamento = 'conta' THEN -valor ELSE 0 END), 0) AS s
            FROM transacoes WHERE usuario_id = ? AND data <= ?""",
-        (usuario_id, date(ano, mes, dias_no_mes).isoformat()),
+        (usuario_id, fim_mes),
+    ).fetchone()["s"] - sum(p["valor"] for p in pagamentos if p["data"] <= fim_mes)
+    saida_conta = _saida_conta_mes(con, usuario_id, ano_mes, pagamentos)
+    despesas_cartao = con.execute(
+        """SELECT COALESCE(SUM(valor), 0) AS s FROM transacoes
+           WHERE usuario_id = ? AND tipo = 'despesa' AND forma_pagamento = 'credito' AND substr(data, 1, 7) = ?""",
+        (usuario_id, ano_mes),
     ).fetchone()["s"]
+    cartao_a_pagar = sum(
+        resumo_cartao(con, c)["usado"]
+        for c in con.execute("SELECT * FROM cartoes WHERE usuario_id = ?", (usuario_id,)).fetchall()
+    )
 
     taxa_poupanca = round((receitas - despesas) / receitas * 100, 1) if receitas else None
 
@@ -136,7 +163,8 @@ def resumo(con, usuario_id, ano_mes):
     # ---- média de despesas dos 3 meses anteriores ----
     anteriores = [_totais_mes(con, usuario_id, _mes_anterior(ano_mes, i))[1] for i in (1, 2, 3)]
     com_dados = [x for x in anteriores if x > 0]
-    media_3m = sum(com_dados) / len(com_dados) if com_dados else 0
+    # com só um mês de histórico a comparação engana (ex.: "551% acima da média")
+    media_3m = sum(com_dados) / len(com_dados) if len(com_dados) >= 2 else 0
 
     insights = gerar_insights(
         receitas, despesas, taxa_poupanca, categorias, projecao, mes_corrente, orcamentos, media_3m
@@ -148,8 +176,10 @@ def resumo(con, usuario_id, ano_mes):
         "indicadores": {
             "receitas": round(receitas, 2),
             "despesas": round(despesas, 2),
-            "saldo_mes": round(receitas - despesas, 2),
+            "saldo_mes": round(receitas - saida_conta, 2),
             "saldo_total": round(float(saldo_total), 2),
+            "despesas_cartao": round(float(despesas_cartao), 2),
+            "cartao_a_pagar": round(cartao_a_pagar, 2),
             "variacao_receitas": _variacao(receitas_hoje, receitas_ant),
             "variacao_despesas": _variacao(despesas_hoje, despesas_ant),
             "taxa_poupanca": taxa_poupanca,

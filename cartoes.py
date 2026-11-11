@@ -41,13 +41,15 @@ def datas_da_fatura(mes_fatura, dia_fechamento, dia_vencimento):
     return fechamento, vencimento
 
 
-def status_fatura(mes_fatura, cartao, paga, hoje=None):
+def status_fatura(mes_fatura, cartao, paga, hoje=None, total=None):
     hoje = hoje or date.today()
     fechamento, vencimento = datas_da_fatura(mes_fatura, cartao["dia_fechamento"], cartao["dia_vencimento"])
     if paga:
         return "paga"
     if hoje < fechamento:
         return "aberta"
+    if not total:
+        return "sem_compras"  # fatura já fechada sem nada para pagar
     if hoje <= vencimento:
         return "fechada"
     return "vencida"
@@ -77,16 +79,31 @@ def _faturas_pagas(con, cartao_id):
     return {l["mes"] for l in con.execute("SELECT mes FROM faturas_pagas WHERE cartao_id = ?", (cartao_id,))}
 
 
-def resumo_cartao(con, cartao, hoje=None):
-    """Limite usado, fatura atual e fatura fechada (a pagar) de um cartão."""
-    hoje = hoje or date.today()
-    pagas = _faturas_pagas(con, cartao["id"])
+def _totais_por_fatura(con, cartao):
     totais = {}
     for t in con.execute(
         "SELECT data, valor FROM transacoes WHERE cartao_id = ? AND tipo = 'despesa'", (cartao["id"],)
     ):
         mes = mes_da_fatura(t["data"], cartao["dia_fechamento"], cartao["dia_vencimento"])
         totais[mes] = totais.get(mes, 0) + t["valor"]
+    return totais
+
+
+def pagamentos_de_fatura(con, usuario_id):
+    """Faturas pagas, com a data do pagamento e o valor. É o momento em que o dinheiro sai da conta."""
+    lista = []
+    for cartao in con.execute("SELECT * FROM cartoes WHERE usuario_id = ?", (usuario_id,)).fetchall():
+        totais = _totais_por_fatura(con, cartao)
+        for f in con.execute("SELECT mes, pago_em FROM faturas_pagas WHERE cartao_id = ?", (cartao["id"],)):
+            lista.append({"data": f["pago_em"][:10], "valor": round(totais.get(f["mes"], 0), 2)})
+    return lista
+
+
+def resumo_cartao(con, cartao, hoje=None):
+    """Limite usado, fatura atual e fatura fechada (a pagar) de um cartão."""
+    hoje = hoje or date.today()
+    pagas = _faturas_pagas(con, cartao["id"])
+    totais = _totais_por_fatura(con, cartao)
 
     usado = sum(v for m, v in totais.items() if m not in pagas)
     atual = mes_da_fatura(hoje, cartao["dia_fechamento"], cartao["dia_vencimento"])
@@ -96,7 +113,7 @@ def resumo_cartao(con, cartao, hoje=None):
         return {
             "mes": mes,
             "total": round(totais.get(mes, 0), 2),
-            "status": status_fatura(mes, cartao, mes in pagas, hoje),
+            "status": status_fatura(mes, cartao, mes in pagas, hoje, totais.get(mes, 0)),
             "fechamento": fechamento.isoformat(),
             "vencimento": vencimento.isoformat(),
         }
@@ -138,14 +155,15 @@ def fatura_detalhada(con, cartao, mes, hoje=None):
         (cartao["id"], inicio.isoformat(), fechamento.isoformat()),
     ).fetchall()
     compras = [dict(l) for l in linhas]
+    total = round(sum(c["valor"] for c in compras), 2)
     paga = mes in _faturas_pagas(con, cartao["id"])
     return {
         "mes": mes,
         "inicio": inicio.isoformat(),
         "fechamento": fechamento.isoformat(),
         "vencimento": vencimento.isoformat(),
-        "status": status_fatura(mes, cartao, paga, hoje),
-        "total": round(sum(c["valor"] for c in compras), 2),
+        "status": status_fatura(mes, cartao, paga, hoje, total),
+        "total": total,
         "compras": compras,
     }
 
@@ -164,9 +182,9 @@ def insights_cartoes(con, usuario_id, hoje=None):
         if f:
             dias = (date.fromisoformat(f["vencimento"]) - hoje).days
             if dias < 0:
-                lista.append({"tipo": "alerta", "texto": f"A fatura do {r['nome']} ({_brl(f['total'])}) venceu há {-dias} dia(s). Marque como paga se já pagou."})
+                lista.append({"tipo": "alerta", "texto": f"A fatura do {r['nome']} ({_brl(f['total'])}) venceu há {-dias} {"dia" if dias == -1 else "dias"}. Marque como paga se já pagou."})
             elif dias <= 5:
-                quando = "hoje" if dias == 0 else f"em {dias} dia(s)"
+                quando = {0: "hoje", 1: "amanhã"}.get(dias, f"em {dias} dias")
                 lista.append({"tipo": "alerta", "texto": f"A fatura do {r['nome']} ({_brl(f['total'])}) vence {quando}."})
         if r["limite"] and r["percentual_usado"] >= 80:
             lista.append({"tipo": "alerta", "texto": f"Você já usou {r['percentual_usado']:.0f}% do limite do {r['nome']}."})

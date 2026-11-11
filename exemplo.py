@@ -107,5 +107,9 @@ def criar_cartao_exemplo(conexao, usuario_id):
     for mes in meses:
         ano, m = map(int, mes.split("-"))
         if date(ano, m, vencimento) < hoje:
-            conexao.execute("INSERT INTO faturas_pagas (cartao_id, mes) VALUES (?, ?)", (cartao_id, mes))
+            # pago no dia do vencimento: é quando o dinheiro sai da conta
+            conexao.execute(
+                "INSERT INTO faturas_pagas (cartao_id, mes, pago_em) VALUES (?, ?, ?)",
+                (cartao_id, mes, date(ano, m, vencimento).isoformat()),
+            )
     return cartao_id
