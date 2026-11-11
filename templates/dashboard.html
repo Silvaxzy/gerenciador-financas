@@ -61,7 +61,10 @@
         <section class="aba" id="aba-visao">
             <div class="kpis">
                 <article class="kpi kpi-destaque">
-                    <span class="kpi-titulo">Saldo do mês</span>
+                    <div class="kpi-cabecalho">
+                        <span class="kpi-titulo" id="kpi-saldo-titulo">Saldo em conta</span>
+                        <button class="ajustar-saldo" id="ajustar-saldo" type="button" title="Informar quanto você tem na conta">✎ Ajustar</button>
+                    </div>
                     <strong id="kpi-saldo">R$ 0,00</strong>
                     <span class="kpi-rodape" id="kpi-saldo-total"></span>
                 </article>
@@ -340,6 +343,34 @@
 
         <p class="mensagem" id="mensagem-modal" role="status"></p>
         <button type="submit" class="botao botao-primario largura-total">Salvar</button>
+    </form>
+</dialog>
+
+<!-- ================= Modal de saldo ================= -->
+<dialog class="modal" id="modal-saldo">
+    <form id="form-saldo" method="dialog">
+        <header class="cartao-topo">
+            <h2>Ajustar saldo em conta</h2>
+            <button type="button" class="fechar" id="fechar-modal-saldo" aria-label="Fechar">✕</button>
+        </header>
+        <p class="texto-suave">Quanto você tem na conta agora? Confira no app do banco. A partir desse valor, o app soma as receitas e desconta as despesas pagas pela conta e as faturas pagas.</p>
+        <p class="saldo-calculado" id="saldo-calculado"></p>
+
+        <div class="duas-colunas">
+            <div>
+                <label for="saldo-valor">Saldo na conta (R$)</label>
+                <input type="number" id="saldo-valor" step="0.01" placeholder="0,00" required>
+            </div>
+            <div>
+                <label for="saldo-data">Conferido em</label>
+                <input type="date" id="saldo-data" required>
+            </div>
+        </div>
+        <p class="dica">Lançamentos que você fizer depois disso entram na conta normalmente. Os anteriores já estão incluídos nesse valor.</p>
+
+        <p class="mensagem" id="mensagem-saldo" role="status"></p>
+        <button type="submit" class="botao botao-primario largura-total">Salvar saldo</button>
+        <button type="button" class="botao botao-fantasma largura-total" id="remover-ajuste" hidden>Voltar ao cálculo automático</button>
     </form>
 </dialog>
 

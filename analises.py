@@ -55,6 +55,39 @@ def _saida_conta_mes(con, usuario_id, ano_mes, pagamentos):
     return float(linha["total"]) + sum(p["valor"] for p in pagamentos if p["data"][:7] == ano_mes)
 
 
+def saldo_em_conta(con, usuario_id, ate, pagamentos):
+    """Quanto há na conta em uma data.
+
+    Se o usuário informou o saldo real (ajuste), parte desse valor e soma só o que
+    aconteceu depois. Sem ajuste, soma todo o histórico. Compras no crédito só saem
+    da conta quando a fatura é paga.
+    """
+    ate = ate.isoformat()
+    ajuste = con.execute(
+        """SELECT data, valor, ultima_transacao_id, criado_em FROM ajustes_saldo
+           WHERE usuario_id = ? AND data <= ? ORDER BY data DESC, id DESC LIMIT 1""",
+        (usuario_id, ate),
+    ).fetchone()
+
+    movimento = """COALESCE(SUM(CASE WHEN tipo = 'receita' THEN valor
+                                     WHEN forma_pagamento = 'conta' THEN -valor ELSE 0 END), 0)"""
+    if not ajuste:
+        base = con.execute(
+            f"SELECT {movimento} AS s FROM transacoes WHERE usuario_id = ? AND data <= ?", (usuario_id, ate)
+        ).fetchone()["s"]
+        return base - sum(p["valor"] for p in pagamentos if p["data"] <= ate)
+
+    # depois do ajuste: dias seguintes, ou o mesmo dia mas lançado depois do ajuste
+    depois = con.execute(
+        f"""SELECT {movimento} AS s FROM transacoes
+            WHERE usuario_id = ? AND data <= ?
+              AND (data > ? OR (data = ? AND id > ?))""",
+        (usuario_id, ate, ajuste["data"], ajuste["data"], ajuste["ultima_transacao_id"]),
+    ).fetchone()["s"]
+    faturas = sum(p["valor"] for p in pagamentos if p["data"] <= ate and p["pago_em"] >= ajuste["criado_em"])
+    return ajuste["valor"] + depois - faturas
+
+
 def mes_padrao(con, usuario_id):
     """Mês atual; se ele estiver vazio, o último mês com dados."""
     atual = date.today().strftime("%Y-%m")
@@ -104,14 +137,9 @@ def resumo(con, usuario_id, ano_mes):
     else:
         projecao = despesas
 
-    # saldo em conta: compras no crédito só saem da conta quando a fatura é paga
-    fim_mes = date(ano, mes, dias_no_mes).isoformat()
-    saldo_total = con.execute(
-        """SELECT COALESCE(SUM(CASE WHEN tipo = 'receita' THEN valor
-                                    WHEN forma_pagamento = 'conta' THEN -valor ELSE 0 END), 0) AS s
-           FROM transacoes WHERE usuario_id = ? AND data <= ?""",
-        (usuario_id, fim_mes),
-    ).fetchone()["s"] - sum(p["valor"] for p in pagamentos if p["data"] <= fim_mes)
+    # saldo em conta: hoje (no mês atual) ou no último dia do mês escolhido
+    data_saldo = hoje if mes_corrente else date(ano, mes, dias_no_mes)
+    saldo_total = saldo_em_conta(con, usuario_id, data_saldo, pagamentos)
     saida_conta = _saida_conta_mes(con, usuario_id, ano_mes, pagamentos)
     despesas_cartao = con.execute(
         """SELECT COALESCE(SUM(valor), 0) AS s FROM transacoes

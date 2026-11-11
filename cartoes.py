@@ -95,7 +95,7 @@ def pagamentos_de_fatura(con, usuario_id):
     for cartao in con.execute("SELECT * FROM cartoes WHERE usuario_id = ?", (usuario_id,)).fetchall():
         totais = _totais_por_fatura(con, cartao)
         for f in con.execute("SELECT mes, pago_em FROM faturas_pagas WHERE cartao_id = ?", (cartao["id"],)):
-            lista.append({"data": f["pago_em"][:10], "valor": round(totais.get(f["mes"], 0), 2)})
+            lista.append({"data": f["pago_em"][:10], "pago_em": f["pago_em"], "valor": round(totais.get(f["mes"], 0), 2)})
     return lista
 
 

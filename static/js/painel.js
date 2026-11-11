@@ -121,12 +121,14 @@ async function carregarResumo() {
 function renderResumo(r) {
     const k = r.indicadores;
 
+    // card principal: quanto há na conta (hoje, ou no fim do mês escolhido)
     const saldo = $("#kpi-saldo");
-    saldo.textContent = formatarMoeda(k.saldo_mes);
-    saldo.classList.toggle("negativo", k.saldo_mes < 0);
-    $("#kpi-saldo-total").textContent = k.cartao_a_pagar > 0
-        ? `Em conta: ${formatarMoeda(k.saldo_total)} · Cartão a pagar: ${formatarMoeda(k.cartao_a_pagar)}`
-        : `Saldo em conta: ${formatarMoeda(k.saldo_total)}`;
+    saldo.textContent = formatarMoeda(k.saldo_total);
+    saldo.classList.toggle("negativo", k.saldo_total < 0);
+    $("#kpi-saldo-titulo").textContent = k.mes_corrente ? "Saldo em conta" : "Saldo em conta no fim do mês";
+    const sinal = k.saldo_mes > 0 ? "+" : "";
+    $("#kpi-saldo-total").textContent = `Resultado do mês: ${sinal}${formatarMoeda(k.saldo_mes)}`
+        + (k.cartao_a_pagar > 0 ? ` · Cartão a pagar: ${formatarMoeda(k.cartao_a_pagar)}` : "");
 
     $("#kpi-receitas").textContent = formatarMoeda(k.receitas);
     $("#kpi-despesas").textContent = formatarMoeda(k.despesas);
@@ -767,6 +769,60 @@ async function excluirCartao() {
     }
 }
 
+// ---------------- saldo em conta ----------------
+
+async function abrirModalSaldo() {
+    $("#mensagem-saldo").textContent = "";
+    $("#saldo-data").value = hojeISO();
+    $("#saldo-valor").value = "";
+    $("#saldo-calculado").textContent = "";
+    $("#remover-ajuste").hidden = true;
+    $("#modal-saldo").showModal();
+    $("#saldo-valor").focus();
+    try {
+        const s = await api("/api/saldo");
+        $("#saldo-calculado").innerHTML = "";
+        const linha = document.createElement("span");
+        linha.append("Pelo app, o saldo hoje é ");
+        const valor = document.createElement("strong");
+        valor.textContent = formatarMoeda(s.saldo_atual);
+        linha.append(valor, ".");
+        if (s.ajuste) linha.append(` Último ajuste: ${formatarMoeda(s.ajuste.valor)} em ${formatarData(s.ajuste.data)}.`);
+        $("#saldo-calculado").append(linha);
+        $("#remover-ajuste").hidden = !s.ajuste;
+    } catch (e) {
+        $("#mensagem-saldo").textContent = e.message;
+    }
+}
+
+async function salvarSaldo(evento) {
+    evento.preventDefault();
+    const botao = evento.target.querySelector("button[type=submit]");
+    botao.disabled = true;
+    try {
+        await api("/api/saldo", { method: "PUT", body: { valor: $("#saldo-valor").value, data: $("#saldo-data").value } });
+        $("#modal-saldo").close();
+        avisar("Saldo atualizado.");
+        await carregarResumo();
+    } catch (e) {
+        $("#mensagem-saldo").textContent = e.message;
+    } finally {
+        botao.disabled = false;
+    }
+}
+
+async function removerAjusteSaldo() {
+    if (!confirm("Voltar a calcular o saldo só pelos lançamentos? Os ajustes informados serão apagados.")) return;
+    try {
+        await api("/api/saldo", { method: "DELETE" });
+        $("#modal-saldo").close();
+        avisar("Saldo voltou ao cálculo automático.");
+        await carregarResumo();
+    } catch (e) {
+        $("#mensagem-saldo").textContent = e.message;
+    }
+}
+
 // ---------------- orçamentos ----------------
 
 function renderOrcamentos() {
@@ -964,6 +1020,10 @@ function iniciar() {
         if (!$("#bloco-cartao").hidden) atualizarParcelas();
     });
 
+    $("#ajustar-saldo").addEventListener("click", abrirModalSaldo);
+    $("#fechar-modal-saldo").addEventListener("click", () => $("#modal-saldo").close());
+    $("#form-saldo").addEventListener("submit", salvarSaldo);
+    $("#remover-ajuste").addEventListener("click", removerAjusteSaldo);
     $("#novo-cartao").addEventListener("click", () => abrirModalCartao());
     $("#novo-cartao-vazio").addEventListener("click", () => abrirModalCartao());
     $("#fechar-modal-cartao").addEventListener("click", () => $("#modal-cartao").close());

@@ -168,7 +168,7 @@ def entrar_demo():
                ORDER BY id DESC LIMIT -1 OFFSET 100"""
         ).fetchall()
         for linha in antigos:
-            for tabela in ("transacoes", "orcamentos", "conexoes_bancarias", "cartoes"):
+            for tabela in ("transacoes", "orcamentos", "conexoes_bancarias", "cartoes", "ajustes_saldo"):
                 conexao.execute(f"DELETE FROM {tabela} WHERE usuario_id = ?", (linha["id"],))
             conexao.execute("DELETE FROM usuarios WHERE id = ?", (linha["id"],))
 
@@ -188,6 +188,12 @@ def entrar_demo():
             [(usuario_id, "Alimentação", 900), (usuario_id, "Transporte", 250), (usuario_id, "Lazer", 200)],
         )
         criar_cartao_exemplo(conexao, usuario_id)
+        # saldo real informado, para a demo mostrar o "Ajustar saldo" em uso
+        ultimo = conexao.execute("SELECT MAX(id) AS m FROM transacoes WHERE usuario_id = ?", (usuario_id,)).fetchone()["m"]
+        conexao.execute(
+            "INSERT INTO ajustes_saldo (usuario_id, data, valor, ultima_transacao_id) VALUES (?, ?, 1850, ?)",
+            (usuario_id, date.today().isoformat(), ultimo or 0),
+        )
     session.clear()
     session["usuario_id"] = usuario_id
     session["email"] = email_visitante
@@ -568,6 +574,60 @@ def pagamento_fatura(cartao_id, mes):
             conexao.execute("INSERT OR IGNORE INTO faturas_pagas (cartao_id, mes) VALUES (?, ?)", (cartao_id, mes))
         else:
             conexao.execute("DELETE FROM faturas_pagas WHERE cartao_id = ? AND mes = ?", (cartao_id, mes))
+    return jsonify({"ok": True})
+
+
+# ================= API: saldo em conta =================
+
+@app.route("/api/saldo")
+@login_obrigatorio
+def ver_saldo():
+    with conectar() as conexao:
+        ajuste = conexao.execute(
+            "SELECT data, valor FROM ajustes_saldo WHERE usuario_id = ? ORDER BY data DESC, id DESC LIMIT 1",
+            (session["usuario_id"],),
+        ).fetchone()
+        atual = analises.saldo_em_conta(
+            conexao, session["usuario_id"], date.today(),
+            regras_cartao.pagamentos_de_fatura(conexao, session["usuario_id"]),
+        )
+    return jsonify({"saldo_atual": round(atual, 2), "ajuste": dict(ajuste) if ajuste else None})
+
+
+@app.route("/api/saldo", methods=["PUT"])
+@login_obrigatorio
+def ajustar_saldo():
+    """Registra quanto o usuário tem de verdade na conta. Os próximos lançamentos partem desse valor."""
+    dados = request.get_json(silent=True) or {}
+    try:
+        valor = round(float(dados.get("valor")), 2)
+    except (TypeError, ValueError):
+        return erro("Informe o saldo da conta.")
+    if abs(valor) > 1_000_000_000:
+        return erro("Valor muito alto.")
+    data = dados.get("data") or date.today().isoformat()
+    try:
+        if datetime.strptime(data, "%Y-%m-%d").date() > date.today():
+            return erro("A data do saldo não pode ser no futuro.")
+    except ValueError:
+        return erro("Data inválida.")
+    with conectar() as conexao:
+        ultimo = conexao.execute(
+            "SELECT COALESCE(MAX(id), 0) AS m FROM transacoes WHERE usuario_id = ?", (session["usuario_id"],)
+        ).fetchone()["m"]
+        conexao.execute(
+            "INSERT INTO ajustes_saldo (usuario_id, data, valor, ultima_transacao_id) VALUES (?, ?, ?, ?)",
+            (session["usuario_id"], data, valor, ultimo),
+        )
+    return jsonify({"ok": True})
+
+
+@app.route("/api/saldo", methods=["DELETE"])
+@login_obrigatorio
+def remover_ajuste_saldo():
+    """Volta a calcular o saldo só pelos lançamentos."""
+    with conectar() as conexao:
+        conexao.execute("DELETE FROM ajustes_saldo WHERE usuario_id = ?", (session["usuario_id"],))
     return jsonify({"ok": True})
 
 

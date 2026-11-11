@@ -324,6 +324,17 @@ button.cc:hover { transform: translateY(-3px); }
 .etiqueta.credito { background: rgba(139, 92, 246, 0.14); color: #c4b5fd; }
 .etiqueta.conta { background: rgba(255, 255, 255, 0.05); color: var(--suave); }
 
+/* ---------- Saldo em conta ---------- */
+.kpi-cabecalho { position: relative; z-index: 2; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.ajustar-saldo {
+    border: 1px solid var(--borda); background: rgba(255, 255, 255, 0.04); color: var(--suave);
+    font: 600 12px inherit; font-family: inherit; padding: 4px 10px; border-radius: 99px; cursor: pointer; transition: 0.2s;
+}
+.ajustar-saldo:hover { color: var(--verde-claro); border-color: var(--borda-forte); }
+.saldo-calculado { margin: 12px 0 2px; padding: 10px 12px; border-radius: 10px; background: var(--card-2); font-size: 13px; color: var(--suave); }
+.saldo-calculado:empty { display: none; }
+.saldo-calculado strong { color: var(--texto); }
+
 /* ---------- Modal ---------- */
 .modal {
     margin: auto; width: min(460px, calc(100% - 32px)); padding: 26px; border-radius: 20px;

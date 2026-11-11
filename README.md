@@ -33,6 +33,7 @@ Aplicação web Full Stack para controle financeiro pessoal, com **integração 
 - Alertas de fatura perto do vencimento e de limite quase no fim
 
 **Gestão**
+- Saldo em conta real: informe quanto há na conta e o app passa a somar e descontar a partir desse valor
 - Cadastro e login com senha criptografada (hash)
 - Criar, editar e excluir transações
 - Filtros por texto, tipo, categoria, origem e período

@@ -102,6 +102,17 @@ def criar_tabelas():
             )
         """)
         conexao.execute("""
+            CREATE TABLE IF NOT EXISTS ajustes_saldo (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                usuario_id INTEGER NOT NULL,
+                data TEXT NOT NULL,                -- dia em que o saldo foi conferido
+                valor REAL NOT NULL,               -- quanto havia na conta
+                ultima_transacao_id INTEGER NOT NULL DEFAULT 0,  -- lançamentos até aqui já estão no valor
+                criado_em TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+                FOREIGN KEY (usuario_id) REFERENCES usuarios (id)
+            )
+        """)
+        conexao.execute("""
             CREATE TABLE IF NOT EXISTS faturas_pagas (
                 cartao_id INTEGER NOT NULL,
                 mes TEXT NOT NULL,  -- mês de vencimento da fatura (AAAA-MM)
